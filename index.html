@@ -1,0 +1,936 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Museo virtual jugable sobre la matemática del Antiguo Egipto: astronomía, agrimensura, círculo, duplicación, ecuaciones cuadráticas y tronco de pirámide.">
+<style>
+html{color-scheme:dark}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<title>Museo de Thot</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=Noto+Sans+Egyptian+Hieroglyphs&display=swap">
+<style>
+/* Layout: one-screen game. A canvas world with a HUD on top, a touch pad below on phones,
+   and a papyrus-styled exhibit panel that opens over the world. Single dark "temple at night" theme. */
+:root{
+  --bg:#14110C; --stone:#2A241A; --stone-2:#3A3225; --surface:#1E1912;
+  --papyrus:#F1E4C0; --papyrus-2:#E4D2A6; --ink:#2B2117; --ink-2:#5C4A33;
+  --gold:#D9A441; --gold-2:#BE8A22; --lapis:#4287D6; --turq:#3FB8AE; --ochre:#B8552A;
+  --text:#F1E7D0; --muted:#BFAE8A; --ok:#5DBB63; --bad:#E07A5F;
+  --display:'Cinzel',Georgia,'Times New Roman',serif;
+  --body:'Source Sans 3','Segoe UI',Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,Menlo,Consolas,monospace;
+  --hiero:'Noto Sans Egyptian Hieroglyphs','Segoe UI Historic','Apple Symbols',serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);font-size:16px;line-height:1.45;
+  -webkit-text-size-adjust:100%;overflow:hidden}
+*{box-sizing:border-box}
+button{font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:.02em;text-wrap:balance;margin:0}
+.eyebrow{font-family:var(--display);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+
+#app{height:100%;display:flex;flex-direction:column;position:relative}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:radial-gradient(ellipse at 50% 20%,#2A2214 0%,var(--bg) 70%);overflow:auto}
+.screen[hidden]{display:none!important}
+.card{width:min(680px,100%);background:linear-gradient(180deg,var(--papyrus),var(--papyrus-2));color:var(--ink);
+  border:2px solid var(--gold-2);border-radius:6px;padding:28px 24px;box-shadow:0 20px 60px rgba(0,0,0,.6);position:relative}
+.card::before,.card::after{content:"";position:absolute;left:10px;right:10px;height:2px;background:repeating-linear-gradient(90deg,var(--gold-2) 0 10px,transparent 10px 16px)}
+.card::before{top:6px}.card::after{bottom:6px}
+.card h1{font-size:clamp(1.7rem,5vw,2.6rem);color:var(--ink);text-align:center}
+.card .sub{text-align:center;color:var(--ink-2);margin:8px 0 18px;font-style:italic}
+.card p{margin:0 0 12px}
+.card label{display:block;font-weight:600;margin:14px 0 6px}
+.card input[type=text]{width:100%;padding:10px 12px;border:1.5px solid var(--ink-2);border-radius:4px;background:#fff9e8;color:var(--ink);font-size:1rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;border-radius:4px;border:2px solid var(--gold-2);
+  background:linear-gradient(180deg,#E7B957,#C8912C);color:#241B0C;font-family:var(--display);font-weight:700;letter-spacing:.06em;font-size:.95rem}
+.btn:hover{filter:brightness(1.07)}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--ink-2)}
+.btn.dark{background:var(--stone-2);color:var(--text);border-color:var(--gold-2)}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:18px}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:12px 0;font-size:.95rem}
+.kbd{display:inline-block;padding:1px 7px;border:1px solid var(--ink-2);border-bottom-width:3px;border-radius:4px;background:#fff9e8;font-family:var(--mono);font-size:.82rem}
+
+/* Game view */
+#game{position:absolute;inset:0;display:flex;flex-direction:column}
+#game[hidden]{display:none!important}
+#hud{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));
+  background:linear-gradient(180deg,#221B10,#1A140C);border-bottom:2px solid var(--gold-2);z-index:3}
+#hud .title{font-family:var(--display);font-weight:700;color:var(--gold);font-size:1.05rem;white-space:nowrap}
+#hud .stat{display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--muted);white-space:nowrap}
+#hud .stat b{color:var(--text);font-variant-numeric:tabular-nums}
+.scarabs{display:flex;gap:3px}
+.scarab{width:18px;height:18px;border-radius:50% 50% 45% 45%;background:#3a3127;border:1.5px solid #5a4b36;position:relative}
+.scarab.on{background:radial-gradient(circle at 40% 35%,#9FE0B0,#1F8A4C 60%,#0E4E2A);border-color:#CFE8B0;box-shadow:0 0 8px #5DBB63}
+.scarab::after{content:"";position:absolute;left:50%;top:3px;bottom:3px;width:1px;background:rgba(0,0,0,.35)}
+#hud .spacer{flex:1}
+.hbtn{padding:5px 10px;border-radius:4px;border:1px solid var(--gold-2);background:#2A2214;color:var(--text);font-family:var(--display);font-size:.78rem;letter-spacing:.08em}
+#world-wrap{flex:1;position:relative;min-height:0;overflow:hidden;background:#0B0907}
+#world{display:block;width:100%;height:100%;touch-action:none}
+#toast{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:rgba(20,16,10,.92);border:1px solid var(--gold-2);color:var(--text);
+  padding:8px 14px;border-radius:4px;font-size:.92rem;max-width:min(92%,520px);text-align:center;pointer-events:none;opacity:0;transition:opacity .25s;z-index:4}
+#toast.show{opacity:1}
+#prompt{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(241,228,192,.95);color:var(--ink);border:2px solid var(--gold-2);
+  padding:8px 14px;border-radius:4px;font-weight:600;display:none;z-index:4;cursor:pointer;max-width:92%}
+#prompt.show{display:block}
+#minimap{position:absolute;right:max(10px,env(safe-area-inset-right,0px));top:10px;background:rgba(20,16,10,.9);border:1px solid var(--gold-2);border-radius:4px;padding:6px;z-index:4;display:none}
+#minimap.show{display:block}
+#minimap canvas{display:block;width:160px;height:150px}
+#minimap .leg{font-size:.7rem;color:var(--muted);margin-top:4px;text-align:center}
+/* touch controls */
+#touch{display:none;position:absolute;left:0;right:0;bottom:0;z-index:4;pointer-events:none;padding:0 max(14px,env(safe-area-inset-right,0px)) max(14px,env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px))}
+body.touch #touch{display:flex;justify-content:space-between;align-items:flex-end}
+.dpad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:4px;pointer-events:auto}
+.dpad button{border-radius:8px;border:1px solid var(--gold-2);background:rgba(42,34,20,.85);color:var(--gold);font-size:1.3rem;touch-action:none;user-select:none;-webkit-user-select:none}
+.dpad button:active{background:#5a4620}
+.dpad .c{visibility:hidden}
+#act{pointer-events:auto;width:84px;height:84px;border-radius:50%;border:2px solid var(--gold-2);background:rgba(217,164,65,.92);color:#241B0C;font-family:var(--display);font-weight:700;font-size:.8rem;letter-spacing:.06em;touch-action:none}
+
+/* Exhibit panel */
+#panel{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:rgba(8,6,3,.72);
+  padding-block:12px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+#panel[hidden]{display:none!important}
+.sheet{width:min(900px,100%);max-height:100%;display:flex;flex-direction:column;background:linear-gradient(180deg,var(--papyrus),var(--papyrus-2));color:var(--ink);
+  border:2px solid var(--gold-2);border-radius:6px;box-shadow:0 24px 70px rgba(0,0,0,.7);overflow:hidden}
+.sheet header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:2px solid var(--gold-2);background:linear-gradient(180deg,#2A2214,#1E1912);color:var(--text)}
+.sheet header .glyph{width:40px;height:40px;border-radius:4px;background:var(--gold);color:#241B0C;display:grid;place-items:center;font-family:var(--hiero);font-weight:700;font-size:1.1rem;flex:none}
+.sheet header h2{font-size:1.1rem;color:var(--gold);min-width:0}
+.sheet header .close{margin-left:auto;background:transparent;border:1px solid var(--gold-2);color:var(--text);border-radius:4px;padding:4px 10px;font-size:1rem}
+.tabs{display:flex;gap:2px;padding:8px 12px 0;background:#E9D8AE;border-bottom:1px solid var(--gold-2);overflow-x:auto}
+.tab{flex:1;min-width:max-content;padding:8px 12px;border:1px solid transparent;border-bottom:none;border-radius:6px 6px 0 0;background:transparent;color:var(--ink-2);font-family:var(--display);font-size:.78rem;letter-spacing:.06em;font-weight:700}
+.tab[aria-selected=true]{background:var(--papyrus);color:var(--ink);border-color:var(--gold-2)}
+.tab .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-left:6px;vertical-align:middle}
+.body{overflow:auto;padding:16px 18px 20px;min-height:0}
+.body p{margin:0 0 10px;max-width:68ch}
+.body ul{margin:0 0 10px;padding-left:20px;max-width:68ch}
+.body li{margin-bottom:4px}
+.formula{font-family:var(--mono);font-size:1.02rem;background:#fff9e8;border:1px solid var(--gold-2);border-left:4px solid var(--gold-2);padding:8px 12px;margin:10px 0;border-radius:3px;overflow-x:auto;white-space:nowrap}
+.note{background:#F8EBC8;border:1px dashed var(--ink-2);padding:8px 12px;border-radius:3px;font-size:.92rem;margin:10px 0;max-width:68ch}
+.note b{color:var(--ochre)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:640px){.cols{grid-template-columns:1fr}}
+.cols>*{min-width:0}
+.lab{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:760px){.lab{grid-template-columns:1fr}}
+.lab .ctl{display:flex;flex-direction:column;gap:10px;min-width:0}
+.ctl label{display:flex;flex-direction:column;gap:3px;font-size:.92rem;font-weight:600}
+.ctl label span{display:flex;justify-content:space-between;gap:8px}
+.ctl label span output{font-family:var(--mono);font-weight:400;color:var(--ochre)}
+.ctl input[type=range]{width:100%;accent-color:var(--gold-2)}
+.ctl input[type=number]{width:100%;padding:6px 8px;border:1px solid var(--ink-2);border-radius:3px;background:#fff9e8;color:var(--ink);font-family:var(--mono)}
+.chip-row{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:5px 10px;border-radius:999px;border:1px solid var(--ink-2);background:#fff9e8;color:var(--ink);font-size:.85rem}
+.chip[aria-pressed=true]{background:var(--gold);border-color:var(--gold-2);font-weight:600}
+.readout{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.95rem;background:#fff9e8;border:1px solid var(--gold-2);padding:10px 12px;border-radius:3px}
+.readout dt{color:var(--ink-2);font-weight:600}
+.readout dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.readout dd.big{font-size:1.15rem;color:var(--ochre);font-weight:700}
+canvas.chart{width:100%;height:260px;display:block;background:#fff9e8;border:1px solid var(--gold-2);border-radius:3px;touch-action:none}
+canvas.fig{width:100%;height:220px;display:block;background:#fff9e8;border:1px solid var(--gold-2);border-radius:3px}
+.cap{font-size:.82rem;color:var(--ink-2);margin:4px 0 8px;font-style:italic}
+table.dup{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:.95rem;background:#fff9e8;border:1px solid var(--gold-2)}
+table.dup th,table.dup td{padding:6px 10px;border-bottom:1px solid #E3D0A2;text-align:right}
+table.dup th{font-family:var(--display);font-size:.72rem;letter-spacing:.08em;color:var(--ink-2);background:#F2E3BD}
+table.dup tr.sel td{background:#F6D98F;font-weight:700}
+table.dup tr.pick{cursor:pointer}
+table.dup tr.pick:hover td{background:#F8E6B4}
+table.dup td.chk{text-align:center;width:36px}
+.bits{display:flex;gap:4px;flex-wrap:wrap;font-family:var(--mono)}
+.bit{width:40px;text-align:center;border:1px solid var(--ink-2);border-radius:3px;background:#fff9e8;padding:3px 0;font-size:.85rem}
+.bit b{display:block;font-size:1.1rem}
+.bit.on{background:var(--gold)}
+/* quiz */
+.quiz{max-width:68ch}
+.q{background:#fff9e8;border:1px solid var(--gold-2);border-radius:4px;padding:14px 16px;margin-bottom:12px}
+.q .qn{font-family:var(--display);font-size:.72rem;letter-spacing:.12em;color:var(--ochre);margin-bottom:6px}
+.q .ans{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.q input[type=text],.q input[type=number]{flex:1;min-width:140px;padding:8px 10px;border:1.5px solid var(--ink-2);border-radius:4px;background:#fff;color:var(--ink);font-family:var(--mono);font-size:1rem}
+.q .unit{font-size:.9rem;color:var(--ink-2)}
+.fb{margin-top:8px;font-size:.95rem;padding:8px 10px;border-radius:3px;display:none}
+.fb.ok{display:block;background:#E3F2DC;border:1px solid var(--ok);color:#1E4F23}
+.fb.bad{display:block;background:#F9E0D8;border:1px solid var(--bad);color:#6E2A1C}
+.q.done{opacity:.75}
+.reward{text-align:center;padding:18px;border:2px solid var(--ok);border-radius:4px;background:#E3F2DC;color:#1E4F23}
+.reward .big{font-family:var(--display);font-size:1.3rem;font-weight:700}
+.opts{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.opts button{text-align:left;padding:8px 12px;border:1px solid var(--ink-2);border-radius:4px;background:#fff;color:var(--ink)}
+.opts button[aria-pressed=true]{background:var(--gold);border-color:var(--gold-2);font-weight:600}
+/* final */
+.diploma{text-align:center}
+.diploma .seal{width:92px;height:92px;border-radius:50%;margin:10px auto;background:radial-gradient(circle at 40% 35%,#9FE0B0,#1F8A4C 60%,#0E4E2A);border:3px solid var(--gold-2);display:grid;place-items:center;font-family:var(--hiero);font-weight:700;color:#fff;font-size:1.6rem;box-shadow:0 0 18px #5DBB63}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:14px 0}
+.stats div{background:#fff9e8;border:1px solid var(--gold-2);padding:8px;border-radius:3px}
+.stats b{display:block;font-family:var(--display);font-size:1.3rem;color:var(--ochre);font-variant-numeric:tabular-nums}
+.stats span{font-size:.8rem;color:var(--ink-2)}
+@media (max-width:480px){.tab{padding:8px 8px;font-size:.7rem;letter-spacing:.03em}.sheet header h2{font-size:.95rem}}
+body.touch #prompt{bottom:200px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+</head>
+<body>
+<div id="app">
+  <!-- Start screen -->
+  <section class="screen" id="start">
+    <div class="card">
+      <div class="eyebrow" style="text-align:center;color:var(--ochre)">Museo virtual · Matemática del Antiguo Egipto</div>
+      <h1>Museo de Thot</h1>
+      <p class="sub">Un templo de seis salas donde cada fórmula se ve, se mueve y se pone a prueba.</p>
+      <p>Sos un aprendiz de escriba. Thot, dios de la escritura y del cálculo, te deja recorrer su templo. En cada sala hay una <b>estela</b> que explica dónde usaban esa matemática los egipcios, un <b>laboratorio</b> para mover la función y verla cambiar, sus <b>usos actuales</b> y un <b>desafío</b>. Cada desafío superado entrega un escarabajo. Con los seis se abre la Cámara del Faraón.</p>
+      <div class="keys">
+        <span><span class="kbd">W A S D</span> / <span class="kbd">← ↑ → ↓</span></span><span>Caminar</span>
+        <span><span class="kbd">E</span> / <span class="kbd">Enter</span></span><span>Examinar la estela o la placa que tengas cerca</span>
+        <span><span class="kbd">M</span></span><span>Mostrar u ocultar el plano del templo</span>
+        <span><span class="kbd">Esc</span></span><span>Cerrar un panel</span>
+      </div>
+      <label for="pname">Nombre del escriba (aparece en el diploma final)</label>
+      <input type="text" id="pname" maxlength="28" placeholder="Por ejemplo: Ahmes" autocomplete="off">
+      <div class="btn-row">
+        <button class="btn" id="btn-start">Entrar al templo</button>
+        <button class="btn ghost" id="btn-continue" hidden>Continuar la visita guardada</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Game -->
+  <section id="game" hidden>
+    <div id="hud">
+      <span class="title"><span style="font-family:var(--hiero)">𓅝</span> Museo de Thot</span>
+      <span class="stat">Escarabajos <span class="scarabs" id="scarabs"></span></span>
+      <span class="stat">Placas <b id="plaques">0</b>/<b id="plaques-total">0</b></span>
+      <span class="stat">Tiempo <b id="timer">00:00</b></span>
+      <span class="spacer"></span>
+      <button class="hbtn" id="btn-map">Plano (M)</button>
+      <button class="hbtn" id="btn-help">Ayuda</button>
+    </div>
+    <div id="world-wrap">
+      <canvas id="world"></canvas>
+      <div id="toast"></div>
+      <button id="prompt"></button>
+      <div id="minimap"><canvas id="mmc" width="320" height="300"></canvas><div class="leg">Verde: sala completada</div></div>
+      <div id="touch">
+        <div class="dpad">
+          <button class="c"></button><button data-dir="up" aria-label="Arriba">▲</button><button class="c"></button>
+          <button data-dir="left" aria-label="Izquierda">◀</button><button class="c"></button><button data-dir="right" aria-label="Derecha">▶</button>
+          <button class="c"></button><button data-dir="down" aria-label="Abajo">▼</button><button class="c"></button>
+        </div>
+        <button id="act">EXAMINAR</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Exhibit panel -->
+  <div id="panel" hidden role="dialog" aria-modal="true" aria-labelledby="panel-title">
+    <div class="sheet">
+      <header><div class="glyph" id="panel-glyph">𓂀</div><h2 id="panel-title">Sala</h2><button class="close" id="panel-close" aria-label="Cerrar">✕</button></header>
+      <div class="tabs" id="tabs" role="tablist"></div>
+      <div class="body" id="panel-body"></div>
+    </div>
+  </div>
+
+  <!-- Final screen -->
+  <section class="screen" id="final" hidden>
+    <div class="card diploma">
+      <div class="eyebrow" style="color:var(--ochre)">Cámara del Faraón</div>
+      <h1>Diploma de Escriba</h1>
+      <div class="seal">𓆣</div>
+      <p id="final-text"></p>
+      <div class="stats" id="final-stats"></div>
+      <p style="color:var(--ink-2);font-size:.9rem">Las seis salas muestran la misma idea: una necesidad concreta (medir tierras, contar días, construir, repartir) se convierte en una fórmula, y esa fórmula sigue viva en el GPS, los satélites, las computadoras y la ingeniería.</p>
+      <div class="btn-row">
+        <button class="btn" id="btn-back">Seguir recorriendo</button>
+        <button class="btn ghost" id="btn-reset">Reiniciar la visita</button>
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+/* ============================ CONTENIDO DE LAS SALAS ============================ */
+const SALAS = [
+{ id:'s1', glyph:'𓇼', nombre:'Sala del Cielo', tema:'Astronomía y medición del tiempo', floor:'night',
+  egipto:`
+<p>Los egipcios organizaban el año mirando el cielo. La estrella <b>Sirio</b> (Sopdet) desaparece unos meses y reaparece al amanecer poco antes de la crecida del Nilo: ese <i>orto helíaco</i> marcaba el comienzo del ciclo anual. Los <b>decanos</b>, 36 grupos de estrellas que salen uno tras otro cada diez días, servían para contar las horas de la noche y dieron la división en 12 horas nocturnas y 12 diurnas.</p>
+<p>El <b>calendario civil</b> tenía 12 meses de 30 días más 5 días epagómenos: <b>365 días exactos</b>. Las tres estaciones seguían al río: <b>Akhet</b> (inundación), <b>Peret</b> (siembra) y <b>Shemu</b> (cosecha).</p>
+<div class="formula">365 = 12 × 30 + 5</div>
+<p>El problema es que el año de las estaciones (año trópico) dura <b>365,2422 días</b>. Cada año el calendario civil se adelantaba casi un cuarto de día; a los 4 años, un día entero; a los 120 años, un mes. Una fiesta de la inundación terminaba cayendo en plena cosecha. Para medir intervalos usaban <b>relojes de sombra</b> (la sombra de una varilla) de día y <b>clepsidras</b> (recipientes de agua con marcas) de noche.</p>
+<div class="note"><b>Cuidado:</b> la reaparición de Sirio era una referencia útil, no una predicción exacta de la crecida; la fecha y la intensidad de la inundación cambiaban de un año a otro.</div>`,
+  lab:'lab1',
+  hoy:`
+<p>El mismo problema sigue existiendo: el año no tiene un número entero de días. El <b>calendario gregoriano</b> lo corrige con un año bisiesto cada 4 años, salvo en los años divisibles por 100 que no lo son por 400. Así el desfase acumulado se mantiene siempre por debajo de un día.</p>
+<ul>
+<li><b>Relojes atómicos:</b> el segundo se define con una frecuencia del átomo de cesio-133. Redes, bancos y telecomunicaciones dependen de que todos los equipos compartan la misma hora.</li>
+<li><b>GPS:</b> cada satélite emite su posición y la hora exacta. El receptor mide cuánto tardó la señal y calcula la distancia con <span class="formula" style="display:inline;padding:2px 6px">d = c · t</span>, donde c es la velocidad de la luz. Con al menos cuatro satélites resuelve su posición y corrige su propio reloj. Un error de un microsegundo son 300 metros de error.</li>
+<li><b>Astronomía moderna:</b> las órbitas se describen con modelos matemáticos y los datos de los telescopios se procesan con algoritmos.</li>
+</ul>`,
+  quiz:[
+   {q:'Sin ninguna corrección, ¿cuántos días se habrá corrido el calendario civil egipcio después de 100 años? (Usá 0,2422 días por año y redondeá al entero.)', unit:'días', ans:24, tol:0.6, hint:'Multiplicá 100 × 0,2422 y redondeá.'},
+   {q:'Una señal de GPS tarda 0,07 segundos en llegar del satélite al receptor. Si viaja a 300.000 km/s, ¿a qué distancia está el satélite?', unit:'km', ans:21000, tol:1, hint:'d = c · t = 300.000 × 0,07.'}
+  ],
+  placas:[
+   'Las horas egipcias no duraban siempre lo mismo: 12 horas de luz y 12 de noche, más largas o más cortas según la estación.',
+   'Los cinco días epagómenos cerraban el año: 12 meses de 30 días más 5 días de fiesta dedicados a los dioses.'
+  ]},
+
+{ id:'s2', glyph:'𓈗', nombre:'Sala del Nilo', tema:'Agrimensura y medición de terrenos', floor:'nile',
+  egipto:`
+<p>Cada año la crecida del Nilo cubría los campos y borraba los límites entre las parcelas. Cuando el agua bajaba, los <b>tensadores de cuerdas</b> volvían a medir: cuerdas con nudos, varas rígidas y estacas para marcar esquinas. De esa medición dependían los impuestos, el reparto de tierras y los registros de los escribas (el <b>Papiro Wilbour</b> lista parcelas, ocupantes y cultivadores bajo Ramsés V).</p>
+<p>Las unidades formaban un sistema:</p>
+<ul>
+<li><b>Codo real</b> ≈ 52,5 cm = 7 palmos = 28 dedos.</li>
+<li><b>Khet</b> = 100 codos ≈ 52,5 m (unidad para distancias largas).</li>
+<li><b>Setjat</b> = un cuadrado de 1 khet de lado = 10.000 codos² ≈ 2.756 m².</li>
+</ul>
+<p>Para una parcela rectangular, la superficie es base por altura:</p>
+<div class="formula">A = b × h &nbsp;&nbsp;&nbsp; ejemplo: 10 khet × 5 khet = 50 setjat</div>
+<p>Una parcela irregular se partía en rectángulos y triángulos, se calculaba cada parte y se sumaban. El <b>Papiro de Rhind</b> (copiado por el escriba Ahmes hacia 1650 a. C.) reúne decenas de problemas de este tipo.</p>`,
+  lab:'lab2',
+  hoy:`
+<p>La agrimensura actual responde las mismas preguntas (¿dónde empieza y termina un terreno?, ¿cuánto mide?) con otras herramientas:</p>
+<ul>
+<li><b>GPS / GNSS:</b> receptores con corrección que ubican un punto con precisión de centímetros.</li>
+<li><b>Estación total:</b> mide ángulos y distancias y calcula coordenadas de cientos de puntos.</li>
+<li><b>Drones y fotogrametría:</b> fotos aéreas superpuestas que se convierten en modelos 3D del terreno.</li>
+<li><b>SIG (Sistemas de Información Geográfica):</b> mapas que cruzan parcelas, ríos, pendientes y uso del suelo para decidir, por ejemplo, qué zonas se inundarían.</li>
+</ul>
+<p>La fórmula no cambió: el área de un polígono se calcula a partir de las coordenadas de sus vértices, que es la versión moderna de "partir el terreno en figuras simples y sumar".</p>`,
+  quiz:[
+   {q:'Una parcela rectangular mide 12 khet de largo y 7 khet de ancho. ¿Cuál es su superficie?', unit:'setjat', ans:84, tol:0.01, hint:'A = b × h = 12 × 7.'},
+   {q:'Un codo tiene 7 palmos y cada palmo tiene 4 dedos. ¿Cuántos dedos hay en 1 khet (100 codos)?', unit:'dedos', ans:2800, tol:0.01, hint:'Primero: 7 × 4 dedos por codo. Después, por 100.'}
+  ],
+  placas:[
+   'El codo real medía unos 52,5 cm: 7 palmos de 4 dedos cada uno. Se conservan varas de codo en museos.',
+   'Un setjat equivale a unos 2.756 m², algo más de un cuarto de hectárea.'
+  ]},
+
+{ id:'s3', glyph:'𓍢', nombre:'Sala del Círculo', tema:'El área del círculo y el número pi', floor:'sand',
+  egipto:`
+<p>El <b>problema 50 del Papiro de Rhind</b> pide el área de un campo circular de 9 khet de diámetro. La regla del escriba: quitarle al diámetro su novena parte y elevar al cuadrado lo que queda.</p>
+<div class="formula">A ≈ (8/9 · d)² &nbsp;&nbsp;&nbsp; con d = 9: (8)² = 64 setjat</div>
+<p>Comparada con la fórmula actual, esa regla equivale a usar <b>π ≈ 3,16</b> (256/81). El error es menor al 1 %, suficiente para repartir tierras y graneros. Los egipcios no tenían el símbolo π ni una demostración: tenían un procedimiento que funcionaba.</p>
+<p>Siglos después, <b>Arquímedes</b> (siglo III a. C.) demostró que el área del círculo es igual a la de un triángulo de base igual a la circunferencia y altura igual al radio, y encerró π entre 3 + 10/71 y 3 + 1/7 usando polígonos inscritos y circunscritos.</p>
+<div class="formula">C = 2πr &nbsp;&nbsp;→&nbsp;&nbsp; A = C · r / 2 = πr²</div>
+<p>Como el radio aparece al cuadrado, <b>duplicar el radio cuadruplica el área</b>: un círculo de radio 6 tiene 36π, cuatro veces los 9π del de radio 3.</p>`,
+  lab:'lab3',
+  hoy:`
+<ul>
+<li><b>Riego de pivote central:</b> un brazo de aspersores gira alrededor de un punto y riega un círculo. Con radio 400 m cubre π·400² ≈ 502.655 m², unas 50 hectáreas. Desde el satélite se ven como monedas verdes.</li>
+<li><b>Tuberías y conductos:</b> el caudal que pasa depende del área de la sección, πr². Duplicar el diámetro de un caño cuadruplica cuánta agua puede llevar.</li>
+<li><b>Construcción:</b> columnas, bases circulares, tanques y silos.</li>
+<li><b>Ruedas, engranajes y antenas:</b> dimensiones, giros y superficies que concentran señales.</li>
+<li><b>Ondas y trigonometría:</b> la circunferencia es la base para describir cualquier fenómeno periódico, del sonido a la corriente alterna.</li>
+</ul>`,
+  quiz:[
+   {q:'Una plaza circular tiene 14 m de diámetro. ¿Cuál es su área? (Usá π ≈ 3,1416 y respondé con dos decimales.)', unit:'m²', ans:153.94, tol:0.3, hint:'Primero el radio: 14 / 2 = 7. Después π × 7².'},
+   {q:'Si el radio de un círculo se duplica, ¿por cuánto se multiplica su área?', unit:'veces', ans:4, tol:0.01, hint:'El radio aparece elevado al cuadrado en la fórmula.'}
+  ],
+  placas:[
+   'Arquímedes demostró que π está entre 3 + 10/71 y 3 + 1/7, es decir entre 3,1408 y 3,1429.',
+   'La regla egipcia (8/9 · d)² equivale a π ≈ 3,1605. Su error es menor al 1 %.'
+  ]},
+
+{ id:'s4', glyph:'𓏤', nombre:'Sala del Escriba', tema:'Multiplicación por duplicación y numeración', floor:'papyrus',
+  egipto:`
+<p>La numeración egipcia era <b>decimal y aditiva</b>: un trazo valía 1, un asa 10, una cuerda enrollada 100, una flor de loto 1.000. Para escribir 23 se repetían dos asas y tres trazos. No había tablas de multiplicar: los escribas multiplicaban <b>duplicando y sumando</b>.</p>
+<p>Para 13 × 11 se duplica el 11 y se anotan las potencias de dos al lado:</p>
+<div class="formula">1 → 11 &nbsp;|&nbsp; 2 → 22 &nbsp;|&nbsp; 4 → 44 &nbsp;|&nbsp; 8 → 88</div>
+<p>Como 13 = 8 + 4 + 1, se marcan esas filas y se suman: 88 + 44 + 11 = <b>143</b>. El método aparece en el Papiro de Rhind y funciona para cualquier par de números, porque todo entero se puede escribir como suma de potencias de dos distintas.</p>
+<div class="formula">13 = 8 + 4 + 1 = 2³ + 2² + 2⁰ &nbsp;&nbsp;→&nbsp;&nbsp; 1101 en binario</div>
+<div class="note"><b>Aclaración histórica:</b> los egipcios no conocían el sistema binario. La relación con el binario es una lectura moderna que explica por qué el método siempre funciona.</div>`,
+  lab:'lab4',
+  hoy:`
+<p>Las computadoras guardan los números en <b>bits</b> (0 y 1), es decir, como sumas de potencias de dos. Multiplicar en un procesador es, en esencia, lo que hacía el escriba: desplazar (duplicar) y sumar las filas que corresponden a los bits en 1.</p>
+<ul>
+<li><b>Procesadores:</b> la multiplicación binaria usa sumas parciales y desplazamientos.</li>
+<li><b>Criptografía:</b> la "exponenciación por cuadrados repetidos", base de las claves públicas, usa la misma idea de descomponer en potencias de dos.</li>
+<li><b>Pensamiento algorítmico:</b> muestra que una misma operación puede resolverse con distintos procedimientos, y que descomponer un problema en partes simples es una estrategia general.</li>
+</ul>`,
+  quiz:[
+   {type:'dup', A:21, B:17, q:'Multiplicá 21 × 17 al estilo egipcio: marcá las filas cuyas potencias de dos suman 21 y comprobá.', hint:'21 = 16 + 4 + 1.'},
+   {q:'¿Cómo se escribe el número 21 en binario?', unit:'', ans:'10101', text:true, hint:'21 = 16 + 4 + 1 → bits 16, 8, 4, 2, 1 → 1 0 1 0 1.'}
+  ],
+  placas:[
+   'Thot, el dios con cabeza de ibis, era patrono de los escribas, de la escritura y del cálculo.',
+   'El Papiro de Rhind fue copiado por el escriba Ahmes hacia 1650 a. C. y contiene más de 80 problemas.'
+  ]},
+
+{ id:'s5', glyph:'𓊖', nombre:'Sala de la Parábola', tema:'Ecuaciones cuadráticas', floor:'sand',
+  egipto:`
+<p>Los egipcios no escribían ecuaciones con letras, pero resolvían problemas que hoy traducimos a ecuaciones de segundo grado. En el <b>Papiro de Berlín</b> se pide repartir un cuadrado de área 100 en dos cuadrados cuyos lados estén en proporción 3 : 4. En notación actual:</p>
+<div class="formula">x² + (¾·x)² = 100 &nbsp;&nbsp;→&nbsp;&nbsp; x = 8 &nbsp;y&nbsp; ¾·x = 6</div>
+<p>Los <b>babilonios</b> resolvían problemas equivalentes en tablillas de arcilla; los <b>griegos</b> los trataban con construcciones geométricas; <b>Brahmagupta</b> en la India trabajó con cantidades negativas; y en el siglo IX <b>al-Juarismi</b> sistematizó la resolución "completando el cuadrado". La fórmula resolvente es el resultado de ese largo camino:</p>
+<div class="formula">ax² + bx + c = 0 &nbsp;&nbsp;→&nbsp;&nbsp; x = (−b ± √(b² − 4ac)) / 2a</div>
+<p>El <b>discriminante</b> Δ = b² − 4ac dice cuántas soluciones reales hay: dos si es positivo, una (doble) si es cero, ninguna si es negativo. Gráficamente, la función y = ax² + bx + c es una <b>parábola</b>, y sus soluciones son los puntos donde corta el eje horizontal.</p>`,
+  lab:'lab5',
+  hoy:`
+<ul>
+<li><b>Física:</b> una pelota lanzada hacia arriba sigue h(t) = −5t² + 20t. Vuelve al suelo cuando h = 0 (t = 4 s) y alcanza su altura máxima en el vértice (t = 2 s, h = 20 m).</li>
+<li><b>Optimización:</b> con 40 m de alambre, el cerco rectangular de mayor superficie es A(x) = x(20 − x) = −x² + 20x. El máximo está en el vértice, x = 10: un cuadrado de 100 m².</li>
+<li><b>Geometría:</b> un rectángulo de 40 m² cuyo largo supera en 3 m al ancho cumple x(x + 3) = 40, es decir x² + 3x − 40 = 0 → x = 5 (se descarta −8).</li>
+<li><b>Antenas parabólicas y reflectores:</b> la parábola refleja hacia su foco todos los rayos que llegan paralelos al eje.</li>
+<li><b>Ingeniería y arquitectura:</b> cables de puentes colgantes, arcos y problemas de dimensionamiento.</li>
+</ul>`,
+  quiz:[
+   {q:'Una pelota sigue h(t) = −5t² + 20t (altura en metros, tiempo en segundos). ¿Cuál es la altura máxima que alcanza?', unit:'m', ans:20, tol:0.01, hint:'El vértice está en t = −b / 2a = −20 / (2·(−5)) = 2. Calculá h(2).'},
+   {q:'Un rectángulo tiene 40 m² y su largo supera en 3 m al ancho. ¿Cuánto mide el ancho?', unit:'m', ans:5, tol:0.01, hint:'x(x + 3) = 40 → x² + 3x − 40 = 0 → (x + 8)(x − 5) = 0.'}
+  ],
+  placas:[
+   'Al-Juarismi (siglo IX) explicaba cómo resolver ecuaciones con palabras y dibujos, sin usar letras ni símbolos. De su nombre viene la palabra "algoritmo".',
+   'En el Papiro de Berlín aparece un problema que hoy se escribe como un sistema con una ecuación cuadrática.'
+  ]},
+
+{ id:'s6', glyph:'𓉴', nombre:'Sala de la Pirámide', tema:'El tronco de pirámide y el Papiro de Moscú', floor:'stone',
+  egipto:`
+<p>Si se corta una pirámide con un plano paralelo a la base y se quita la punta, queda un <b>tronco de pirámide</b>: dos bases cuadradas de lados a y b, unidas por cuatro caras trapezoidales, separadas por la altura h. Es la forma de una mastaba y de una pirámide a medio construir.</p>
+<p>El <b>problema 14 del Papiro de Moscú</b> (hacia 1850 a. C.) calcula el volumen de un tronco con base mayor 4, base menor 2 y altura 6. El escriba hace: 4² = 16, 4 × 2 = 8, 2² = 4; suma 28; toma un tercio de la altura, 2; y multiplica: <b>56</b>. Es exactamente la fórmula actual:</p>
+<div class="formula">V = (h / 3) · (a² + a·b + b²)</div>
+<p>La fórmula se entiende como la diferencia entre la pirámide completa y la pirámide pequeña que se quitó. Para la superficie hace falta la <b>apotema lateral</b> g, la altura inclinada de cada cara, que sale del teorema de Pitágoras:</p>
+<div class="formula">g = √( h² + ((a − b)/2)² ) &nbsp;&nbsp;·&nbsp;&nbsp; A<sub>lateral</sub> = 2 (a + b) g &nbsp;&nbsp;·&nbsp;&nbsp; A<sub>total</sub> = A<sub>lateral</sub> + a² + b²</div>
+<div class="note"><b>Cuidado:</b> el papiro conserva el procedimiento, no una demostración general. Los egipcios sabían calcular el volumen; la justificación de por qué funciona llegó mucho después.</div>`,
+  lab:'lab6',
+  hoy:`
+<ul>
+<li><b>Construcción:</b> bases de monumentos, pedestales, terraplenes y presas de tierra tienen sección de tronco de pirámide; el volumen dice cuántos camiones de material hacen falta.</li>
+<li><b>Recipientes:</b> macetas, baldes y contenedores con paredes inclinadas: el volumen es la capacidad, la superficie total es el material para fabricarlos.</li>
+<li><b>Diseño y arquitectura:</b> pantallas de lámparas, torres y edificios escalonados.</li>
+<li><b>Ingeniería civil:</b> movimiento de suelos y cálculo de cortes y rellenos en caminos.</li>
+</ul>
+<p>La idea de fondo (un sólido difícil se calcula como diferencia o suma de sólidos simples) es la misma que usa cualquier programa de diseño 3D.</p>`,
+  quiz:[
+   {q:'Resolvé el problema 14 del Papiro de Moscú: base mayor 4, base menor 2, altura 6. ¿Cuál es el volumen del tronco?', unit:'unidades³', ans:56, tol:0.01, hint:'(6/3) · (16 + 8 + 4).'},
+   {q:'Un tronco tiene a = 10 cm, b = 6 cm y h = 12 cm. ¿Cuánto mide la apotema lateral g? (Dos decimales.)', unit:'cm', ans:12.17, tol:0.03, hint:'g = √(12² + ((10 − 6)/2)²) = √(144 + 4).'}
+  ],
+  placas:[
+   'El Papiro de Moscú tiene 25 problemas y se fecha hacia 1850 a. C., unos dos siglos antes que el de Rhind.',
+   'La forma de tronco de pirámide aparece en las mastabas, las tumbas rectangulares de paredes inclinadas anteriores a las pirámides.'
+  ]}
+];
+const EXTRA_PLACAS = [
+  {room:'hall', text:'Para ubicar un receptor GPS se necesitan señales de al menos cuatro satélites, cada uno con su propio reloj atómico.'},
+  {room:'hall', text:'El Papiro Wilbour (siglo XII a. C.) registra parcelas, ocupantes y cultivadores del Egipto central bajo Ramsés V.'}
+];
+</script>
+<script>
+/* ================================ MOTOR DEL MUSEO ================================ */
+const T = 32, W = 64, H = 60;
+const ROOMS = {
+  hall:   {x0:24,y0:14,x1:39,y1:57, floor:'hall',  name:'Gran Galería'},
+  pharaoh:{x0:24,y0:2, x1:39,y1:12, floor:'gold',  name:'Cámara del Faraón'},
+  s1:{x0:2, y0:14,x1:21,y1:27}, s2:{x0:42,y0:14,x1:61,y1:27},
+  s3:{x0:2, y0:29,x1:21,y1:42}, s4:{x0:42,y0:29,x1:61,y1:42},
+  s5:{x0:2, y0:44,x1:21,y1:57}, s6:{x0:42,y0:44,x1:61,y1:57},
+};
+SALAS.forEach(s=>{ ROOMS[s.id].floor=s.floor; ROOMS[s.id].name=s.nombre; ROOMS[s.id].sala=s; });
+
+const solid = Array.from({length:H},()=>new Uint8Array(W).fill(1));
+const roomOf = Array.from({length:H},()=>new Array(W).fill(null));
+function carve(x0,y0,x1,y1,id){ for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){ solid[y][x]=0; if(id) roomOf[y][x]=id; } }
+for(const [id,r] of Object.entries(ROOMS)) carve(r.x0,r.y0,r.x1,r.y1,id);
+const DOORS = [];
+for(const id of ['s1','s3','s5']){ const r=ROOMS[id]; carve(22,r.y0+6,23,r.y0+7,'hall'); DOORS.push({x:22,y:r.y0+6,w:2,h:2}); }
+for(const id of ['s2','s4','s6']){ const r=ROOMS[id]; carve(40,r.y0+6,41,r.y0+7,'hall'); DOORS.push({x:40,y:r.y0+6,w:2,h:2}); }
+carve(31,13,32,13,'hall'); // puerta sellada de la Cámara
+
+/* Objetos interactivos y decorativos */
+const OBJS = [];
+function addObj(o){ OBJS.push(o); if(o.solid) for(let y=o.ty;y<o.ty+o.th;y++) for(let x=o.tx;x<o.tx+o.tw;x++) solid[y][x]=1; return o; }
+SALAS.forEach((s,i)=>{
+  const r=ROOMS[s.id]; const cx=Math.floor((r.x0+r.x1)/2);
+  addObj({kind:'exhibit', sala:s, tx:cx, ty:r.y0+4, tw:2, th:1, solid:true, fx:cx+1, fy:r.y0+5.6, label:'Examinar la estela: '+s.nombre});
+  addObj({kind:'plaque', key:s.id+'a', text:s.placas[0], tx:r.x0+3, ty:r.y0-1, tw:1, th:1, fx:r.x0+3.5, fy:r.y0+0.6, label:'Leer la placa'});
+  addObj({kind:'plaque', key:s.id+'b', text:s.placas[1], tx:r.x1-3, ty:r.y0-1, tw:1, th:1, fx:r.x1-2.5, fy:r.y0+0.6, label:'Leer la placa'});
+});
+addObj({kind:'plaque', key:'h1', text:EXTRA_PLACAS[0].text, tx:23, ty:20, tw:1, th:1, fx:24.6, fy:20.5, label:'Leer la placa'});
+addObj({kind:'plaque', key:'h2', text:EXTRA_PLACAS[1].text, tx:40, ty:48, tw:1, th:1, fx:39.4, fy:48.5, label:'Leer la placa'});
+addObj({kind:'statue', tx:31, ty:45, tw:2, th:2, solid:true, fx:32, fy:47.6, label:'Hablar con la estatua de Thot'});
+addObj({kind:'throne', tx:31, ty:4, tw:2, th:2, solid:true, fx:32, fy:6.6, label:'Acercarse al trono'});
+const SEALED = addObj({kind:'sealed', tx:31, ty:13, tw:2, th:1, fx:32, fy:14.6, label:'Puerta de la Cámara del Faraón'});
+const COLUMNS=[]; for(const x of [26,37]) for(let y=17;y<=52;y+=5){ COLUMNS.push({x,y}); solid[y][x]=1; }
+const TORCHES=[]; for(const id of ['s1','s2','s3','s4','s5','s6','pharaoh']){ const r=ROOMS[id]; TORCHES.push({x:r.x0+1,y:r.y0-1},{x:r.x1-1,y:r.y0-1}); }
+TORCHES.push({x:28,y:13},{x:35,y:13},{x:28,y:57},{x:35,y:57});
+const TOTAL_PLAQUES = OBJS.filter(o=>o.kind==='plaque').length;
+
+/* PRNG con semilla para texturas estables */
+function rng(seed){ let s=seed>>>0||1; return ()=>{ s^=s<<13; s>>>=0; s^=s>>>17; s^=s<<5; s>>>=0; return (s>>>0)/4294967296; }; }
+
+/* ---------- Pre-render del mapa ---------- */
+const FLOORS = {
+  hall:{base:'#6B5838',dark:'#5E4C30',line:'#7B6845'}, sand:{base:'#7A6744',dark:'#6C5A3B',line:'#8A7650'},
+  night:{base:'#161B33',dark:'#121629',line:'#1E2444'}, nile:{base:'#74633F',dark:'#665636',line:'#846F4A'},
+  papyrus:{base:'#86744C',dark:'#776642',line:'#978457'}, stone:{base:'#5E5A52',dark:'#524E47',line:'#6B675E'},
+  gold:{base:'#7D5F25',dark:'#6C521F',line:'#9A7A35'}
+};
+const mapCanvas=document.createElement('canvas'); mapCanvas.width=W*T; mapCanvas.height=H*T;
+function renderMap(){
+  const c=mapCanvas.getContext('2d'); const rand=rng(7);
+  c.fillStyle='#0B0907'; c.fillRect(0,0,W*T,H*T);
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const px=x*T, py=y*T;
+    if(!solid[y][x]){
+      const f=FLOORS[(ROOMS[roomOf[y][x]]||ROOMS.hall).floor];
+      c.fillStyle=((x+y)&1)?f.base:f.dark; c.fillRect(px,py,T,T);
+      c.strokeStyle=f.line; c.lineWidth=1; c.strokeRect(px+.5,py+.5,T-1,T-1);
+      if(rand()<.08){ c.fillStyle='rgba(0,0,0,.12)'; c.fillRect(px+rand()*20,py+rand()*20,6+rand()*8,3+rand()*5); }
+    }
+  }
+  // Cielo nocturno en la Sala del Cielo
+  const n=ROOMS.s1; c.fillStyle='#F1E7D0';
+  for(let i=0;i<140;i++){ const sx=(n.x0+rand()*(n.x1-n.x0+1))*T, sy=(n.y0+rand()*(n.y1-n.y0+1))*T; c.globalAlpha=.3+rand()*.7; c.fillRect(sx,sy,1.5+rand()*1.5,1.5+rand()*1.5); }
+  c.globalAlpha=1;
+  // Río en la Sala del Nilo
+  const r2=ROOMS.s2; c.fillStyle='#1E4C7A'; c.fillRect((r2.x1-3)*T,r2.y0*T,4*T,(r2.y1-r2.y0+1)*T);
+  c.fillStyle='#2B6DA8'; for(let i=0;i<60;i++){ c.fillRect((r2.x1-3)*T+rand()*4*T,r2.y0*T+rand()*14*T,10+rand()*20,2); }
+  c.fillStyle='#4C7A3A'; for(let i=0;i<40;i++){ c.beginPath(); c.arc((r2.x1-3)*T-4-rand()*10,r2.y0*T+rand()*14*T,2+rand()*3,0,7); c.fill(); }
+  // Cámara del Faraón: alfombra
+  const p=ROOMS.pharaoh; c.fillStyle='#8A2E1E'; c.fillRect(30*T,(p.y0+4)*T,4*T,(p.y1-p.y0-3)*T); c.fillStyle='#D9A441'; c.fillRect(30*T+6,(p.y0+4)*T,3,(p.y1-p.y0-3)*T); c.fillRect(34*T-9,(p.y0+4)*T,3,(p.y1-p.y0-3)*T);
+  // Paredes
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    if(!solid[y][x]) continue;
+    const px=x*T, py=y*T;
+    c.fillStyle='#2A241A'; c.fillRect(px,py,T,T);
+    c.fillStyle='#352D20'; c.fillRect(px,py,T,4);
+    const faceBelow = y+1<H && !solid[y+1][x];
+    if(faceBelow){ // cara frontal con friso
+      const g=c.createLinearGradient(0,py,0,py+T); g.addColorStop(0,'#4A3E2A'); g.addColorStop(1,'#2E2719'); c.fillStyle=g; c.fillRect(px,py,T,T);
+      c.fillStyle='#8A6A2A'; c.fillRect(px,py+T-5,T,2);
+      c.strokeStyle='rgba(217,164,65,.55)'; c.lineWidth=1.2; const k=Math.floor(rand()*5);
+      c.beginPath();
+      if(k===0){ c.arc(px+16,py+14,5,0,7); c.moveTo(px+16,py+19); c.lineTo(px+16,py+25); }
+      else if(k===1){ c.moveTo(px+8,py+22); c.lineTo(px+16,py+8); c.lineTo(px+24,py+22); c.closePath(); }
+      else if(k===2){ c.moveTo(px+7,py+12); c.lineTo(px+25,py+12); c.moveTo(px+7,py+18); c.lineTo(px+25,py+18); c.moveTo(px+7,py+24); c.lineTo(px+25,py+24); }
+      else if(k===3){ c.moveTo(px+10,py+8); c.lineTo(px+10,py+24); c.moveTo(px+16,py+8); c.lineTo(px+16,py+24); c.moveTo(px+22,py+8); c.lineTo(px+22,py+24); }
+      else { c.ellipse(px+16,py+16,8,5,0,0,7); c.moveTo(px+16,py+11); c.arc(px+16,py+16,2.5,0,7); }
+      c.stroke();
+    } else if(x+1<W && !solid[y][x+1] || x>0 && !solid[y][x-1] || y>0 && !solid[y-1][x]){
+      c.fillStyle='#332B1E'; c.fillRect(px+2,py+2,T-4,T-4); c.strokeStyle='#1C1710'; c.strokeRect(px+.5,py+.5,T-1,T-1);
+    }
+  }
+  // Columnas
+  for(const col of COLUMNS){ const px=col.x*T+16, py=col.y*T+16; c.fillStyle='rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(px+3,py+6,15,9,0,0,7); c.fill();
+    const g=c.createRadialGradient(px-5,py-5,2,px,py,15); g.addColorStop(0,'#D9B36A'); g.addColorStop(1,'#7A5E2C'); c.fillStyle=g; c.beginPath(); c.arc(px,py,13,0,7); c.fill(); c.strokeStyle='#4A3818'; c.lineWidth=2; c.stroke(); c.fillStyle='#4A3818'; c.beginPath(); c.arc(px,py,4,0,7); c.fill(); }
+  // Objetos
+  for(const o of OBJS) drawObjStatic(c,o);
+  // Puertas: marco dorado
+  for(const d of DOORS){ c.strokeStyle='#D9A441'; c.lineWidth=2; c.strokeRect(d.x*T+1,d.y*T+1,d.w*T-2,d.h*T-2); }
+  // Vasijas decorativas
+  for(const id of ['s1','s2','s3','s4','s5','s6']){ const r=ROOMS[id]; for(const [vx,vy] of [[r.x0,r.y1],[r.x1,r.y1]]){ const px=vx*T+16,py=vy*T+16; c.fillStyle='#8A3A20'; c.beginPath(); c.ellipse(px,py+2,9,11,0,0,7); c.fill(); c.fillStyle='#B85A2E'; c.fillRect(px-7,py-11,14,4); } }
+}
+function drawObjStatic(c,o){
+  const px=o.tx*T, py=o.ty*T;
+  if(o.kind==='exhibit'){
+    c.fillStyle='rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(px+T,py+T+4,34,8,0,0,7); c.fill();
+    c.fillStyle='#4A3E2A'; c.fillRect(px+4,py+10,2*T-8,T-8); c.fillStyle='#C9A14A'; c.fillRect(px+2,py+6,2*T-4,6);
+    c.fillStyle='#F1E4C0'; c.fillRect(px+10,py-16,2*T-20,26); c.strokeStyle='#8A6A2A'; c.lineWidth=2; c.strokeRect(px+10,py-16,2*T-20,26);
+    c.fillStyle='#2B2117'; c.font='18px "Noto Sans Egyptian Hieroglyphs",serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(o.sala.glyph,px+T,py-3);
+  } else if(o.kind==='plaque'){
+    c.fillStyle='#F1E4C0'; c.fillRect(px+6,py+8,T-12,T-14); c.strokeStyle='#8A6A2A'; c.lineWidth=1.5; c.strokeRect(px+6,py+8,T-12,T-14);
+    c.strokeStyle='#5C4A33'; c.beginPath(); for(let i=0;i<3;i++){ c.moveTo(px+10,py+13+i*4); c.lineTo(px+T-10,py+13+i*4); } c.stroke();
+  } else if(o.kind==='statue'){
+    c.fillStyle='rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(px+T,py+2*T,30,9,0,0,7); c.fill();
+    c.fillStyle='#4A3E2A'; c.fillRect(px+6,py+T+8,2*T-12,T-10); c.fillStyle='#C9A14A'; c.fillRect(px+4,py+T+4,2*T-8,5);
+    c.fillStyle='#3A6B5A'; c.fillRect(px+20,py+6,24,36); c.fillStyle='#D9A441'; c.fillRect(px+18,py+2,28,6);
+    c.fillStyle='#F1E4C0'; c.beginPath(); c.arc(px+32,py-6,10,0,7); c.fill(); c.fillStyle='#2B2117'; c.beginPath(); c.moveTo(px+36,py-6); c.quadraticCurveTo(px+54,py-4,px+52,py+6); c.lineTo(px+48,py+4); c.quadraticCurveTo(px+46,py-2,px+36,py-2); c.fill();
+  } else if(o.kind==='throne'){
+    c.fillStyle='rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(px+T,py+2*T,30,9,0,0,7); c.fill();
+    c.fillStyle='#D9A441'; c.fillRect(px+8,py-10,2*T-16,2*T+6); c.fillStyle='#8A2E1E'; c.fillRect(px+14,py+10,2*T-28,T+10);
+    c.fillStyle='#2B6DA8'; c.beginPath(); c.arc(px+T,py+2,8,0,7); c.fill(); c.fillStyle='#F1E4C0'; c.font='16px "Noto Sans Egyptian Hieroglyphs",serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('𓋹',px+T,py+30);
+  }
+}
+
+/* ---------- Estado del juego ---------- */
+const state = { name:'', done:{}, plaques:{}, attempts:0, elapsed:0, x:32, y:55, started:false };
+const SAVE_KEY='museo-thot-v1';
+function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }catch(e){} }
+function load(){ try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); if(s&&s.started){ Object.assign(state,s); return true; } }catch(e){} return false; }
+const scarabCount=()=>SALAS.filter(s=>state.done[s.id]).length;
+const plaqueCount=()=>Object.keys(state.plaques).length;
+const unlocked=()=>scarabCount()===SALAS.length;
+
+/* ---------- Canvas, cámara y bucle ---------- */
+const cv=document.getElementById('world'), ctx=cv.getContext('2d');
+const wrap=document.getElementById('world-wrap');
+let vw=0, vh=0, dpr=1, zoom=1;
+function resize(){ dpr=Math.min(2,window.devicePixelRatio||1); vw=wrap.clientWidth; vh=wrap.clientHeight; cv.width=Math.round(vw*dpr); cv.height=Math.round(vh*dpr); zoom=Math.min(1.15,Math.max(.72,vw/860)); }
+window.addEventListener('resize',resize);
+
+const keys={}; let touchDir={up:0,down:0,left:0,right:0};
+const player={ r:.33, dir:'down', anim:0, moving:false };
+function blockedAt(x,y){
+  const pts=[[x-player.r,y-player.r],[x+player.r,y-player.r],[x-player.r,y+player.r],[x+player.r,y+player.r]];
+  for(const [px,py] of pts){ const tx=Math.floor(px), ty=Math.floor(py); if(tx<0||ty<0||tx>=W||ty>=H||solid[ty][tx]) return true;
+    if(!unlocked() && ty===13 && (tx===31||tx===32)) return true; }
+  return false;
+}
+let nearObj=null, last=0, timeAcc=0, running=false;
+function nearest(){
+  let best=null, bd=1.45;
+  for(const o of OBJS){ const d=Math.hypot(o.fx-state.x,o.fy-state.y); if(d<bd){ bd=d; best=o; } }
+  return best;
+}
+function update(dt){
+  let dx=(keys.ArrowRight||keys.KeyD||touchDir.right?1:0)-(keys.ArrowLeft||keys.KeyA||touchDir.left?1:0);
+  let dy=(keys.ArrowDown||keys.KeyS||touchDir.down?1:0)-(keys.ArrowUp||keys.KeyW||touchDir.up?1:0);
+  player.moving = !!(dx||dy);
+  if(player.moving){
+    const len=Math.hypot(dx,dy); dx/=len; dy/=len; const sp=4.6*dt;
+    if(!blockedAt(state.x+dx*sp,state.y)) state.x+=dx*sp;
+    if(!blockedAt(state.x,state.y+dy*sp)) state.y+=dy*sp;
+    player.dir = Math.abs(dx)>Math.abs(dy) ? (dx>0?'right':'left') : (dy>0?'down':'up');
+    player.anim+=dt*9;
+  }
+  const n=nearest();
+  if(n!==nearObj){ nearObj=n; const p=document.getElementById('prompt'); if(n){ p.textContent=(isTouch?'':'E · ')+n.label; p.classList.add('show'); } else p.classList.remove('show'); }
+}
+function camera(){ const cw=vw/zoom, ch=vh/zoom; let cx=state.x*T-cw/2, cy=state.y*T-ch/2; cx=Math.max(0,Math.min(W*T-cw,cx)); cy=Math.max(0,Math.min(H*T-ch,cy)); return {cx,cy,cw,ch}; }
+function draw(t){
+  const {cx,cy,cw,ch}=camera();
+  ctx.setTransform(dpr*zoom,0,0,dpr*zoom,0,0); ctx.translate(-cx,-cy);
+  ctx.fillStyle='#0B0907'; ctx.fillRect(cx,cy,cw,ch);
+  ctx.drawImage(mapCanvas,cx,cy,cw,ch,cx,cy,cw,ch);
+  // Río animado
+  const r2=ROOMS.s2; if(cx< (r2.x1+1)*T && cx+cw>(r2.x1-3)*T && cy<(r2.y1+1)*T && cy+ch>r2.y0*T){
+    ctx.save(); ctx.beginPath(); ctx.rect((r2.x1-3)*T,r2.y0*T,4*T,14*T); ctx.clip(); ctx.strokeStyle='rgba(120,190,240,.35)'; ctx.lineWidth=1.5;
+    for(let i=0;i<10;i++){ ctx.beginPath(); const yy=r2.y0*T+i*46+((t/40+i*20)%46); for(let xx=0;xx<=4*T;xx+=8){ ctx.lineTo((r2.x1-3)*T+xx, yy+Math.sin((xx+t/6)/9)*3); } ctx.stroke(); }
+    ctx.restore(); }
+  // Antorchas
+  for(const to of TORCHES){ const px=to.x*T+16, py=to.y*T+22; if(px<cx-80||px>cx+cw+80||py<cy-80||py>cy+ch+80) continue;
+    const fl=.85+Math.sin(t/90+px)*.1+Math.sin(t/37+py)*.05;
+    const g=ctx.createRadialGradient(px,py+10,4,px,py+10,70*fl); g.addColorStop(0,'rgba(255,170,60,.28)'); g.addColorStop(1,'rgba(255,120,30,0)'); ctx.fillStyle=g; ctx.fillRect(px-80,py-70,160,160);
+    ctx.fillStyle='#5C4A33'; ctx.fillRect(px-2,py-2,4,12); ctx.fillStyle='#FFB13D'; ctx.beginPath(); ctx.ellipse(px,py-6,4*fl,7*fl,0,0,7); ctx.fill(); ctx.fillStyle='#FFE08A'; ctx.beginPath(); ctx.ellipse(px,py-5,2,3.5,0,0,7); ctx.fill(); }
+  // Estelas: brillo + gema
+  for(const o of OBJS){ if(o.kind!=='exhibit') continue; const px=o.tx*T+T, py=o.ty*T+10;
+    if(state.done[o.sala.id]){ ctx.fillStyle='#5DBB63'; ctx.beginPath(); ctx.arc(px,py-28,5,0,7); ctx.fill(); ctx.strokeStyle='#CFE8B0'; ctx.stroke(); }
+    else { const a=.35+Math.sin(t/400)*.2; ctx.strokeStyle=`rgba(217,164,65,${a})`; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(px,py+T,36+Math.sin(t/400)*3,10,0,0,7); ctx.stroke(); } }
+  // Puerta sellada
+  if(!unlocked()){ const px=31*T, py=13*T; ctx.fillStyle='#3A3225'; ctx.fillRect(px,py-6,2*T,T+6); ctx.strokeStyle='#D9A441'; ctx.lineWidth=2; ctx.strokeRect(px+3,py-3,2*T-6,T);
+    ctx.fillStyle='#D9A441'; ctx.font='bold 13px Cinzel,serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(scarabCount()+' / 6',px+T,py+14); }
+  else { const px=31*T, py=13*T; const a=.25+Math.sin(t/300)*.15; ctx.fillStyle=`rgba(217,164,65,${a})`; ctx.fillRect(px,py,2*T,T); }
+  // Placa leída: marca
+  for(const o of OBJS){ if(o.kind!=='plaque'||!state.plaques[o.key]) continue; ctx.fillStyle='#5DBB63'; ctx.beginPath(); ctx.arc(o.tx*T+T-7,o.ty*T+11,3,0,7); ctx.fill(); }
+  // Indicador del objeto cercano
+  if(nearObj){ const px=nearObj.fx*T, py=(nearObj.kind==='plaque'?nearObj.ty*T+2:nearObj.ty*T-24)+Math.sin(t/250)*3; ctx.fillStyle='#F1E4C0'; ctx.beginPath(); ctx.moveTo(px,py+8); ctx.lineTo(px-6,py); ctx.lineTo(px+6,py); ctx.closePath(); ctx.fill(); }
+  drawPlayer(ctx,state.x*T,state.y*T,t);
+  // Nombre de la sala actual
+  const rid=roomOf[Math.floor(state.y)]?.[Math.floor(state.x)]; if(rid){ ctx.setTransform(dpr,0,0,dpr,0,0); ctx.font='600 13px Cinzel,serif'; ctx.textAlign='left'; ctx.textBaseline='top'; const name=ROOMS[rid].name.toUpperCase(); const wdt=ctx.measureText(name).width+20; ctx.fillStyle='rgba(20,16,10,.8)'; ctx.fillRect(10,10,wdt,26); ctx.fillStyle='#D9A441'; ctx.fillText(name,20,16); }
+}
+function drawPlayer(c,px,py,t){
+  const bob=player.moving?Math.sin(player.anim*2)*1.5:0, leg=player.moving?Math.sin(player.anim)*5:0;
+  c.fillStyle='rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(px,py+9,11,5,0,0,7); c.fill();
+  c.fillStyle='#8C5A3C'; c.fillRect(px-6+leg*.5,py-2,5,11); c.fillRect(px+1-leg*.5,py-2,5,11);
+  c.fillStyle='#F3EBD3'; c.beginPath(); c.moveTo(px-7,py-12+bob); c.lineTo(px+7,py-12+bob); c.lineTo(px+10,py+3); c.lineTo(px-10,py+3); c.closePath(); c.fill();
+  c.fillStyle='#C98A5B'; c.fillRect(px-7,py-24+bob,14,13); c.fillRect(px-11,py-22+bob,4,11); c.fillRect(px+7,py-22+bob,4,11);
+  c.fillStyle='#D9A441'; c.fillRect(px-7,py-24+bob,14,3);
+  c.fillStyle='#C98A5B'; c.beginPath(); c.arc(px,py-32+bob,8,0,7); c.fill();
+  c.fillStyle='#1A1410'; c.beginPath(); c.arc(px,py-34+bob,8.5,Math.PI,2*Math.PI); c.fill(); c.fillRect(px-8.5,py-34+bob,3,10); c.fillRect(px+5.5,py-34+bob,3,10);
+  if(player.dir!=='up'){ c.fillStyle='#1A1410'; const ex=player.dir==='left'?-4:player.dir==='right'?1:-3; c.fillRect(px+ex,py-32+bob,2.2,2.2); if(player.dir==='down') c.fillRect(px+1.5,py-32+bob,2.2,2.2); }
+  if(player.dir==='right'||player.dir==='down'){ c.fillStyle='#F1E4C0'; c.fillRect(px+9,py-16+bob,3,9); c.fillStyle='#8A6A2A'; c.fillRect(px+8,py-17+bob,5,2); }
+}
+function loop(ts){
+  if(!running) return;
+  const dt=Math.min(.05,(ts-last)/1000||0); last=ts;
+  if(!panelOpen && !modalOpen){ update(dt); state.elapsed+=dt; timeAcc+=dt; if(timeAcc>5){ timeAcc=0; save(); } }
+  draw(ts); updateHud();
+  requestAnimationFrame(loop);
+}
+function updateHud(){
+  const m=Math.floor(state.elapsed/60), s=Math.floor(state.elapsed%60);
+  document.getElementById('timer').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  document.getElementById('plaques').textContent=plaqueCount();
+}
+function renderScarabs(){ const el=document.getElementById('scarabs'); el.innerHTML=SALAS.map(s=>`<span class="scarab${state.done[s.id]?' on':''}" title="${s.nombre}"></span>`).join(''); }
+let toastTimer=0;
+function toast(msg,ms=3000){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),ms); }
+
+/* Minimapa */
+let mapShown=false;
+function drawMinimap(){
+  const mc=document.getElementById('mmc').getContext('2d'); const s=5; mc.fillStyle='#14110C'; mc.fillRect(0,0,320,300);
+  for(const [id,r] of Object.entries(ROOMS)){ const done=r.sala&&state.done[id]; mc.fillStyle= id==='pharaoh'?(unlocked()?'#D9A441':'#4A3818'):done?'#2F7A3A':'#5E4C30'; mc.fillRect(r.x0*s,r.y0*s,(r.x1-r.x0+1)*s,(r.y1-r.y0+1)*s);
+    if(r.sala){ mc.fillStyle='#F1E7D0'; mc.font='16px "Noto Sans Egyptian Hieroglyphs",serif'; mc.textAlign='center'; mc.textBaseline='middle'; mc.fillText(r.sala.glyph,(r.x0+r.x1+1)/2*s,(r.y0+r.y1+1)/2*s); } }
+  for(const d of DOORS) { mc.fillStyle='#8A7650'; mc.fillRect(d.x*s,d.y*s,d.w*s,d.h*s); }
+  mc.fillStyle='#FF6B4A'; mc.beginPath(); mc.arc(state.x*s,state.y*s,5,0,7); mc.fill(); mc.strokeStyle='#fff'; mc.stroke();
+}
+function toggleMap(force){ mapShown = force===undefined ? !mapShown : force; document.getElementById('minimap').classList.toggle('show',mapShown); if(mapShown) drawMinimap(); }
+setInterval(()=>{ if(mapShown&&running) drawMinimap(); },500);
+
+/* Entrada */
+const isTouch = matchMedia('(pointer:coarse)').matches; if(isTouch) document.body.classList.add('touch');
+window.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+  keys[e.code]=true;
+  if(!running) return;
+  if(e.code==='KeyE'||e.code==='Enter'||e.code==='Space'){ if(!panelOpen&&!modalOpen) interact(); }
+  if(e.code==='KeyM'&&!panelOpen) toggleMap();
+  if(e.code==='Escape'){ if(panelOpen||modalOpen) closePanel(); else if(mapShown) toggleMap(false); }
+});
+window.addEventListener('keyup',e=>{ keys[e.code]=false; });
+window.addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; });
+document.querySelectorAll('.dpad [data-dir]').forEach(b=>{ const d=b.dataset.dir; const on=e=>{ e.preventDefault(); touchDir[d]=1; }; const off=e=>{ e.preventDefault(); touchDir[d]=0; };
+  b.addEventListener('pointerdown',on); b.addEventListener('pointerup',off); b.addEventListener('pointercancel',off); b.addEventListener('pointerleave',off); });
+document.getElementById('act').addEventListener('click',()=>interact());
+document.getElementById('prompt').addEventListener('click',()=>interact());
+document.getElementById('btn-map').addEventListener('click',()=>toggleMap());
+document.getElementById('btn-help').addEventListener('click',()=>showHelp());
+
+function interact(){
+  const o=nearObj; if(!o) return;
+  if(o.kind==='exhibit') openSala(o.sala);
+  else if(o.kind==='plaque'){ const first=!state.plaques[o.key]; state.plaques[o.key]=true; save(); showModal('Placa del templo', `<p>${o.text}</p>` + (first?`<p class="note">Placa registrada: ${plaqueCount()} de ${TOTAL_PLAQUES}.</p>`:'')); }
+  else if(o.kind==='statue') showHelp();
+  else if(o.kind==='sealed'){ toast(unlocked()?'La puerta está abierta. Pasá.':`La puerta está sellada. Faltan ${6-scarabCount()} escarabajos.`); }
+  else if(o.kind==='throne'){ if(unlocked()) showFinal(); else toast('El trono espera a quien reúna los seis escarabajos.'); }
+}
+function showHelp(){
+  showModal('Thot, señor de los escribas', `
+<p><b>Bienvenido, ${state.name||'aprendiz'}.</b> Este templo guarda seis salas. En cada una hay una <b>estela</b> brillante: acercate y examinala. Vas a encontrar cuatro pestañas:</p>
+<ul><li><b>En Egipto:</b> dónde y para qué usaban esa matemática.</li><li><b>Laboratorio:</b> movés los valores y ves cómo cambia la función o la figura.</li><li><b>Hoy:</b> dónde se aplica la misma idea en la actualidad.</li><li><b>Desafío:</b> dos preguntas. Si las respondés, ganás el escarabajo de la sala.</li></ul>
+<p>Las <b>placas</b> pequeñas en las paredes tienen datos curiosos. Con los seis escarabajos se abre la puerta del fondo de la galería, donde te espera el trono del faraón y tu diploma.</p>
+<p class="cap">Movete con las flechas o W A S D; examiná con E; abrí el plano con M.</p>`);
+}
+</script>
+<script>
+/* ================================ GRÁFICOS ================================ */
+const fmt=(v,d=2)=>{ v=Number(v); if(Math.abs(v)<1e-9) v=0; return v.toLocaleString('es-AR',{maximumFractionDigits:d}); };
+function parseNum(raw){ let t=String(raw).trim().replace(/\s/g,''); if(/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(t)) t=t.replace(/\./g,''); return parseFloat(t.replace(',','.')); }
+function niceTicks(min,max,n=5){ const span=max-min||1; const s0=span/n, mag=Math.pow(10,Math.floor(Math.log10(s0))), norm=s0/mag; const step=(norm<1.5?1:norm<3?2:norm<7?5:10)*mag; const t=[]; for(let v=Math.ceil(min/step-1e-9)*step; v<=max+1e-9; v+=step) t.push(+v.toFixed(10)); return t; }
+const CH={gold:'#BE8A22',lapis:'#4287D6',ink:'#2B2117',muted:'#6E5C45',grid:'#E6D6AE',axis:'#9C8A66'};
+function plot(cv,o){
+  cv._plot=o; const d=Math.min(2,devicePixelRatio||1), w=cv.clientWidth||600, h=cv.clientHeight||260;
+  if(cv.width!==Math.round(w*d)||cv.height!==Math.round(h*d)){ cv.width=Math.round(w*d); cv.height=Math.round(h*d); }
+  const c=cv.getContext('2d'); c.setTransform(d,0,0,d,0,0); c.clearRect(0,0,w,h);
+  const L=52,R=14,Tp=16,B=36, pw=w-L-R, ph=h-Tp-B;
+  const X=x=>L+(x-o.xmin)/(o.xmax-o.xmin)*pw, Y=y=>Tp+ph-(y-o.ymin)/(o.ymax-o.ymin)*ph;
+  c.font='11px "Source Sans 3",sans-serif'; c.fillStyle=CH.muted; c.strokeStyle=CH.grid; c.lineWidth=1;
+  for(const tx of niceTicks(o.xmin,o.xmax,6)){ const px=Math.round(X(tx))+.5; c.beginPath(); c.moveTo(px,Tp); c.lineTo(px,Tp+ph); c.stroke(); c.textAlign='center'; c.textBaseline='top'; c.fillText(fmt(tx),px,Tp+ph+5); }
+  for(const ty of niceTicks(o.ymin,o.ymax,5)){ const py=Math.round(Y(ty))+.5; c.beginPath(); c.moveTo(L,py); c.lineTo(L+pw,py); c.stroke(); c.textAlign='right'; c.textBaseline='middle'; c.fillText(fmt(ty),L-6,py); }
+  c.strokeStyle=CH.axis; c.lineWidth=1.2; if(o.ymin<=0&&o.ymax>=0){ c.beginPath(); c.moveTo(L,Y(0)); c.lineTo(L+pw,Y(0)); c.stroke(); } if(o.xmin<=0&&o.xmax>=0){ c.beginPath(); c.moveTo(X(0),Tp); c.lineTo(X(0),Tp+ph); c.stroke(); }
+  c.fillStyle=CH.ink; c.font='600 11px "Source Sans 3",sans-serif'; c.textAlign='center'; c.textBaseline='bottom'; c.fillText(o.xlab||'',L+pw/2,h-2);
+  c.save(); c.translate(12,Tp+ph/2); c.rotate(-Math.PI/2); c.fillText(o.ylab||'',0,0); c.restore();
+  c.save(); c.beginPath(); c.rect(L,Tp,pw,ph); c.clip();
+  for(const s of o.series){ c.strokeStyle=s.color; c.lineWidth=2.2; c.setLineDash(s.dash||[]); c.beginPath(); let first=true, prev=null;
+    for(const [x,y] of s.pts){ if(!isFinite(y)){ first=true; continue; } if(s.step&&prev&&!first) c.lineTo(X(x),Y(prev[1])); if(first){ c.moveTo(X(x),Y(y)); first=false; } else c.lineTo(X(x),Y(y)); prev=[x,y]; }
+    c.stroke(); c.setLineDash([]); }
+  for(const v of o.vlines||[]){ c.strokeStyle=CH.axis; c.setLineDash([4,4]); c.beginPath(); c.moveTo(X(v.x),Tp); c.lineTo(X(v.x),Tp+ph); c.stroke(); c.setLineDash([]); if(v.label){ c.fillStyle=CH.muted; c.font='11px "Source Sans 3",sans-serif'; c.textAlign='left'; c.textBaseline='bottom'; c.fillText(v.label,X(v.x)+4,Tp+ph-4); } }
+  c.restore();
+  for(const p of o.points||[]){ const px=X(p.x), py=Y(p.y); if(px<L-2||px>L+pw+2||py<Tp-2||py>Tp+ph+2) continue; c.fillStyle='#fff9e8'; c.beginPath(); c.arc(px,py,7,0,7); c.fill(); c.fillStyle=p.color||CH.gold; c.beginPath(); c.arc(px,py,5,0,7); c.fill();
+    if(p.label){ c.fillStyle=CH.ink; c.font='600 11px "Source Sans 3",sans-serif'; c.textAlign=p.align||'left'; c.textBaseline='bottom'; c.fillText(p.label,px+(p.align==='right'?-9:9),py-6); } }
+  if(o.series.length>1){ let lx=L+10, ly=Tp+10; c.font='11px "Source Sans 3",sans-serif'; c.textAlign='left'; c.textBaseline='middle';
+    const lw=Math.max(...o.series.map(s=>c.measureText(s.label).width))+34; c.fillStyle='rgba(255,249,232,.9)'; c.fillRect(lx-6,ly-8,lw,o.series.length*16+6);
+    for(const s of o.series){ c.strokeStyle=s.color; c.lineWidth=2.2; c.setLineDash(s.dash||[]); c.beginPath(); c.moveTo(lx,ly); c.lineTo(lx+18,ly); c.stroke(); c.setLineDash([]); c.fillStyle=CH.ink; c.fillText(s.label,lx+24,ly); ly+=16; } }
+  if(o.hoverX!=null && o.hoverX>=o.xmin && o.hoverX<=o.xmax){ const hx=o.hoverX, px=X(hx); c.strokeStyle=CH.axis; c.setLineDash([3,3]); c.beginPath(); c.moveTo(px,Tp); c.lineTo(px,Tp+ph); c.stroke(); c.setLineDash([]);
+    const rows=[(o.xname||'x')+' = '+fmt(hx,o.xd??2)]; for(const s of o.series){ const y=interp(s.pts,hx,s.step); if(y==null) continue; rows.push(s.label+': '+fmt(y,o.yd??2)); const py=Y(y); if(py>=Tp&&py<=Tp+ph){ c.fillStyle=s.color; c.beginPath(); c.arc(px,py,4,0,7); c.fill(); c.strokeStyle='#fff9e8'; c.lineWidth=1.5; c.stroke(); } }
+    c.font='11px "Source Sans 3",sans-serif'; const tw=Math.max(...rows.map(r=>c.measureText(r).width))+14, th=rows.length*15+8; let bx=px+10; if(bx+tw>w-4) bx=px-10-tw; const by=Tp+ph/2-th/2;
+    c.fillStyle='rgba(43,33,23,.92)'; c.fillRect(bx,by,tw,th); c.fillStyle='#F1E7D0'; c.textAlign='left'; c.textBaseline='top'; rows.forEach((r,i)=>c.fillText(r,bx+7,by+5+i*15)); }
+  if(!cv._bound){ cv._bound=true; const mv=e=>{ const r=cv.getBoundingClientRect(); const o2=cv._plot; const x=o2.xmin+(e.clientX-r.left-L)/(r.width-L-R)*(o2.xmax-o2.xmin); o2.hoverX=x; plot(cv,o2); };
+    cv.addEventListener('pointermove',mv); cv.addEventListener('pointerdown',mv); cv.addEventListener('pointerleave',()=>{ cv._plot.hoverX=null; plot(cv,cv._plot); }); }
+}
+function interp(pts,x,step){ if(!pts.length||x<pts[0][0]||x>pts[pts.length-1][0]) return null; let lo=0, hi=pts.length-1; while(hi-lo>1){ const m=(lo+hi)>>1; if(pts[m][0]<=x) lo=m; else hi=m; } const [x0,y0]=pts[lo], [x1,y1]=pts[hi]; if(step||x1===x0) return y0; return y0+(y1-y0)*(x-x0)/(x1-x0); }
+function fig(cvs){ const d=Math.min(2,devicePixelRatio||1), w=cvs.clientWidth||400, h=cvs.clientHeight||220; cvs.width=Math.round(w*d); cvs.height=Math.round(h*d); const c=cvs.getContext('2d'); c.setTransform(d,0,0,d,0,0); c.clearRect(0,0,w,h); return {c,w,h}; }
+const slider=(id,label,min,max,val,step=1)=>`<label><span>${label} <output id="${id}-o">${fmt(val)}</output></span><input type="range" id="${id}" min="${min}" max="${max}" value="${val}" step="${step}"></label>`;
+const $=id=>document.getElementById(id);
+const bind=(ids,fn)=>{ ids.forEach(id=>$(id).addEventListener('input',fn)); fn(); };
+
+/* ================================ LABORATORIOS ================================ */
+const LABS={
+lab1(el){
+  el.innerHTML=`<div class="lab"><div class="ctl">
+    <p>Función lineal del desfase: <span class="formula" style="display:inline;padding:2px 8px">D(n) = 0,2422 · n</span> días después de n años. Movés los años y ves cuánto se corrió el calendario civil respecto de las estaciones, comparado con el calendario actual.</p>
+    ${slider('l1n','Años transcurridos',4,1500,200,1)}
+    <dl class="readout"><dt>Desfase civil</dt><dd class="big" id="l1d"></dd><dt>Equivale a</dt><dd id="l1m"></dd><dt>Desfase gregoriano</dt><dd id="l1g"></dd></dl>
+    <p class="cap">Con un cuarto de día por año, la fecha de la inundación recorre todo el calendario y vuelve a coincidir recién a los 1460 años (ciclo sotíaco).</p>
+  </div><div><canvas class="chart" id="l1c"></canvas><p class="cap">Días de desfase acumulado. Pasá el puntero por el gráfico para leer valores.</p></div></div>`;
+  bind(['l1n'],()=>{ const N=+$('l1n').value; $('l1n-o').value=N; const civil=0.2422*N; const leap=n=>Math.floor(n/4)-Math.floor(n/100)+Math.floor(n/400); const greg=[]; for(let n=0;n<=N;n++) greg.push([n,0.2422*n-leap(n)]);
+    $('l1d').textContent=fmt(civil,1)+' días'; $('l1m').textContent=civil<60?fmt(civil/7,1)+' semanas':fmt(civil/30,1)+' meses'; $('l1g').textContent=fmt(greg[N][1],2)+' días';
+    plot($('l1c'),{xmin:0,xmax:N,ymin:Math.min(-1,-civil*.05),ymax:Math.max(2,civil*1.05),xlab:'años',ylab:'días de desfase',xname:'año',xd:0,
+      series:[{label:'Calendario civil egipcio',color:CH.gold,pts:[[0,0],[N,civil]]},{label:'Calendario gregoriano',color:CH.lapis,pts:greg,step:true}],points:[{x:N,y:civil,label:fmt(civil,0)+' días',align:'right'}]}); });
+},
+lab2(el){
+  el.innerHTML=`<div class="lab"><div class="ctl">
+    <p>El área de la parcela es el producto de sus lados: <span class="formula" style="display:inline;padding:2px 8px">A = b × h</span>. Con la altura fija, el área es una <b>función lineal</b> de la base.</p>
+    ${slider('l2b','Base b (khet)',1,12,10,1)}${slider('l2h','Altura h (khet)',1,12,5,1)}
+    <dl class="readout"><dt>Área</dt><dd class="big" id="l2a"></dd><dt>En metros²</dt><dd id="l2m"></dd><dt>En hectáreas</dt><dd id="l2ha"></dd><dt>Cuerda necesaria (perímetro)</dt><dd id="l2p"></dd></dl>
+    <canvas class="fig" id="l2f"></canvas><p class="cap">La parcela a escala sobre una grilla de 1 khet. Cada cuadrado es 1 setjat.</p>
+  </div><div><canvas class="chart" id="l2c"></canvas><p class="cap">A(b) = b · h con la altura actual: una recta que pasa por el origen cuya pendiente es h.</p></div></div>`;
+  bind(['l2b','l2h'],()=>{ const b=+$('l2b').value,h=+$('l2h').value; $('l2b-o').value=b; $('l2h-o').value=h; const A=b*h;
+    $('l2a').textContent=A+' setjat'; $('l2m').textContent=fmt(A*2756.25,0)+' m²'; $('l2ha').textContent=fmt(A*0.275625,2)+' ha'; $('l2p').textContent=(2*b+2*h)+' khet = '+fmt((2*b+2*h)*100,0)+' codos';
+    const {c,w,hh}={...fig($('l2f')),hh:0}; const H2=$('l2f').clientHeight||220; const u=Math.min((w-30)/12,(H2-30)/12); const ox=15, oy=H2-15;
+    c.strokeStyle='#E6D6AE'; for(let i=0;i<=12;i++){ c.beginPath(); c.moveTo(ox+i*u,oy); c.lineTo(ox+i*u,oy-12*u); c.stroke(); c.beginPath(); c.moveTo(ox,oy-i*u); c.lineTo(ox+12*u,oy-i*u); c.stroke(); }
+    c.fillStyle='rgba(190,138,34,.45)'; c.fillRect(ox,oy-h*u,b*u,h*u); c.strokeStyle=CH.gold; c.lineWidth=2; c.strokeRect(ox,oy-h*u,b*u,h*u);
+    c.fillStyle=CH.ink; c.font='600 12px "Source Sans 3",sans-serif'; c.textAlign='center'; c.textBaseline='top'; c.fillText('b = '+b+' khet',ox+b*u/2,oy-h*u-16>5?oy-h*u-16:oy+2); c.save(); c.translate(ox+b*u+12,oy-h*u/2); c.rotate(-Math.PI/2); c.textBaseline='middle'; c.fillText('h = '+h,0,0); c.restore();
+    c.fillText(A+' setjat',ox+b*u/2,oy-h*u/2-7); 
+    plot($('l2c'),{xmin:0,xmax:12,ymin:0,ymax:Math.max(20,12*h*1.05),xlab:'base b (khet)',ylab:'área (setjat)',xname:'b',xd:1,yd:1,series:[{label:'A = b·'+h,color:CH.gold,pts:[[0,0],[12,12*h]]}],points:[{x:b,y:A,label:'('+b+', '+A+')'}]}); });
+},
+lab3(el){
+  el.innerHTML=`<div class="chip-row" style="margin-bottom:10px"><button class="chip" id="l3m1" aria-pressed="true">Comparar fórmulas</button><button class="chip" id="l3m2" aria-pressed="false">Porciones (idea de Arquímedes)</button></div><div id="l3body"></div>`;
+  const m1=()=>{ $('l3body').innerHTML=`<div class="lab"><div class="ctl">
+      <p>Área exacta <span class="formula" style="display:inline;padding:2px 8px">A = π r²</span> frente a la regla del Papiro de Rhind <span class="formula" style="display:inline;padding:2px 8px">A ≈ (8/9 · d)²</span>, con d = 2r.</p>
+      ${slider('l3r','Radio r (m)',1,10,5,0.5)}
+      <dl class="readout"><dt>Área exacta</dt><dd class="big" id="l3a"></dd><dt>Área egipcia</dt><dd id="l3e"></dd><dt>Diferencia</dt><dd id="l3d"></dd><dt>Circunferencia</dt><dd id="l3p"></dd></dl>
+      <canvas class="fig" id="l3f"></canvas><p class="cap">Campo de riego de pivote central: el brazo gira y cubre un círculo de radio r.</p>
+    </div><div><canvas class="chart" id="l3c"></canvas><p class="cap">El área crece con el cuadrado del radio: la curva es una parábola, no una recta.</p></div></div>`;
+    bind(['l3r'],()=>{ const r=+$('l3r').value; $('l3r-o').value=fmt(r,1); const A=Math.PI*r*r, E=Math.pow(8/9*2*r,2); $('l3a').textContent=fmt(A,2)+' m²'; $('l3e').textContent=fmt(E,2)+' m²'; $('l3d').textContent='+'+fmt((E/A-1)*100,2)+' %'; $('l3p').textContent=fmt(2*Math.PI*r,2)+' m';
+      const {c,w,h}=fig($('l3f')); const R=Math.min(w,h)/2-14; const cx=w/2, cy=h/2; const rr=R*r/10;
+      c.fillStyle='#8A7850'; c.fillRect(cx-R-8,cy-R-8,2*R+16,2*R+16); c.fillStyle='#4C7A3A'; c.beginPath(); c.arc(cx,cy,rr,0,7); c.fill(); c.strokeStyle='#2E4F22'; c.lineWidth=1; for(let i=1;i<5;i++){ c.beginPath(); c.arc(cx,cy,rr*i/5,0,7); c.stroke(); }
+      c.strokeStyle='#F1E7D0'; c.lineWidth=3; c.beginPath(); c.moveTo(cx,cy); c.lineTo(cx+rr,cy); c.stroke(); c.fillStyle='#F1E7D0'; c.beginPath(); c.arc(cx,cy,4,0,7); c.fill(); c.font='600 12px "Source Sans 3",sans-serif'; c.textAlign='center'; c.textBaseline='bottom'; c.fillText('r = '+fmt(r,1)+' m',cx+rr/2,cy-5);
+      const pts=[],pe=[]; for(let x=0;x<=10;x+=.25){ pts.push([x,Math.PI*x*x]); pe.push([x,Math.pow(16/9*x,2)]); }
+      plot($('l3c'),{xmin:0,xmax:10,ymin:0,ymax:330,xlab:'radio r (m)',ylab:'área (m²)',xname:'r',xd:2,yd:1,series:[{label:'π r²',color:CH.gold,pts},{label:'(8/9 · 2r)²  (Rhind)',color:CH.lapis,pts:pe,dash:[6,4]}],points:[{x:r,y:A,label:fmt(A,1)+' m²'}]}); }); };
+  const m2=()=>{ $('l3body').innerHTML=`<div class="lab"><div class="ctl">
+      <p>Si el círculo se corta en porciones iguales y se acomodan alternadas, la figura se parece cada vez más a un rectángulo de <b>base π r</b> (media circunferencia) y <b>altura r</b>. Por eso A = π r · r = π r².</p>
+      ${slider('l3n','Cantidad de porciones',4,64,8,2)}
+      <dl class="readout"><dt>Base de la figura</dt><dd id="l3b"></dd><dt>Altura</dt><dd id="l3h"></dd><dt>Área</dt><dd class="big" id="l3aa"></dd></dl>
+    </div><div><canvas class="fig" id="l3g" style="height:300px"></canvas><p class="cap">Arriba, el círculo cortado; abajo, las mismas porciones reacomodadas. Cuantas más porciones, más recto queda el borde.</p></div></div>`;
+    bind(['l3n'],()=>{ const n=+$('l3n').value; $('l3n-o').value=n; const r=1; $('l3b').textContent='≈ π·r = '+fmt(Math.PI,3)+' r'; $('l3h').textContent='r'; $('l3aa').textContent='π r² ≈ '+fmt(Math.PI,3)+' r²';
+      const {c,w,h}=fig($('l3g')); const R=Math.min(h*.26,w*.2); const cx=w/2, cy=R+12; const th=2*Math.PI/n;
+      for(let i=0;i<n;i++){ c.fillStyle=i%2?'#BE8A22':'#4287D6'; c.beginPath(); c.moveTo(cx,cy); c.arc(cx,cy,R,i*th,(i+1)*th); c.closePath(); c.fill(); c.strokeStyle='#fff9e8'; c.lineWidth=1; c.stroke(); }
+      const half=R*Math.sin(th/2), totalW=n*half+half; const sx=cx-totalW/2, by=h-16, ty=by-R;
+      for(let i=0;i<n;i++){ const up=i%2===0; c.save(); c.translate(sx+half*(i+1), up?by:by-R*Math.cos(th/2)); c.rotate(up?0:Math.PI); c.fillStyle=i%2?'#BE8A22':'#4287D6'; c.beginPath(); c.moveTo(0,0); c.arc(0,0,R,-Math.PI/2-th/2,-Math.PI/2+th/2); c.closePath(); c.fill(); c.strokeStyle='#fff9e8'; c.stroke(); c.restore(); }
+      c.strokeStyle=CH.ink; c.setLineDash([4,3]); c.strokeRect(sx+half/2,ty,n*half,by-ty); c.setLineDash([]); c.fillStyle=CH.ink; c.font='600 12px "Source Sans 3",sans-serif'; c.textAlign='center'; c.textBaseline='top'; c.fillText('base ≈ π r',cx,by+1); c.textAlign='left'; c.textBaseline='middle'; c.fillText('altura = r',sx+n*half+half/2+6,(ty+by)/2); }); };
+  $('l3m1').onclick=()=>{ $('l3m1').setAttribute('aria-pressed','true'); $('l3m2').setAttribute('aria-pressed','false'); m1(); };
+  $('l3m2').onclick=()=>{ $('l3m2').setAttribute('aria-pressed','true'); $('l3m1').setAttribute('aria-pressed','false'); m2(); };
+  m1();
+},
+lab4(el){
+  el.innerHTML=`<div class="lab"><div class="ctl">
+    <p>Elegí dos números. El segundo se duplica fila por fila; el primero se descompone en potencias de dos y se marcan esas filas. La suma de las filas marcadas es el producto.</p>
+    <label><span>Primer factor (se descompone)</span><input type="number" id="l4a" min="1" max="999" value="13"></label>
+    <label><span>Segundo factor (se duplica)</span><input type="number" id="l4b" min="1" max="9999" value="11"></label>
+    <dl class="readout"><dt>Descomposición</dt><dd id="l4d"></dd><dt>Producto</dt><dd class="big" id="l4p"></dd></dl>
+    <p style="font-weight:600;margin-bottom:4px">El primer factor en binario</p><div class="bits" id="l4bits"></div><p class="cap">Cada bit en 1 es una fila marcada. Así guarda los números una computadora.</p>
+  </div><div><table class="dup"><thead><tr><th>Potencia de 2</th><th>Duplicación</th><th>Se usa</th></tr></thead><tbody id="l4t"></tbody></table></div></div>`;
+  bind(['l4a','l4b'],()=>{ let A=Math.max(1,Math.min(999,Math.floor(+$('l4a').value||1))), B=Math.max(1,Math.min(9999,Math.floor(+$('l4b').value||1))); const rows=[]; let p=1,v=B; while(p<=A){ rows.push({p,v,on:!!(A&p)}); p*=2; v*=2; }
+    $('l4t').innerHTML=rows.map(r=>`<tr class="${r.on?'sel':''}"><td>${r.p}</td><td>${r.v}</td><td class="chk">${r.on?'✔':''}</td></tr>`).join('');
+    const used=rows.filter(r=>r.on); $('l4d').textContent=A+' = '+used.map(r=>r.p).reverse().join(' + '); $('l4p').textContent=used.map(r=>r.v).reverse().join(' + ')+' = '+(A*B);
+    const bits=A.toString(2).split(''); const nb=bits.length; $('l4bits').innerHTML=bits.map((b,i)=>`<div class="bit ${b==='1'?'on':''}"><b>${b}</b>${Math.pow(2,nb-1-i)}</div>`).join(''); });
+},
+lab5(el){
+  el.innerHTML=`<div class="chip-row" style="margin-bottom:10px" id="l5p">
+    <button class="chip" data-a="-5" data-b="20" data-c="0">Pelota: h(t) = −5t² + 20t</button><button class="chip" data-a="-1" data-b="20" data-c="0">Cerco: A = −x² + 20x</button>
+    <button class="chip" data-a="1" data-b="-5" data-c="6">x² − 5x + 6</button><button class="chip" data-a="1" data-b="-4" data-c="-5">x² − 4x − 5</button><button class="chip" data-a="1" data-b="2" data-c="5">x² + 2x + 5 (sin raíces reales)</button></div>
+  <div class="lab"><div class="ctl">
+    <p>Función cuadrática <span class="formula" style="display:inline;padding:2px 8px">y = a x² + b x + c</span>. Las raíces son los cortes con el eje horizontal; el vértice es el máximo o el mínimo.</p>
+    ${slider('l5a','a',-5,5,-5,0.5)}${slider('l5b','b',-20,20,20,1)}${slider('l5c','c',-20,20,0,1)}
+    <dl class="readout"><dt>Ecuación</dt><dd id="l5eq"></dd><dt>Discriminante Δ</dt><dd id="l5d"></dd><dt>Raíces</dt><dd class="big" id="l5r"></dd><dt>Vértice</dt><dd id="l5v"></dd><dt>Abre hacia</dt><dd id="l5o"></dd></dl>
+  </div><div><canvas class="chart" id="l5c2" style="height:320px"></canvas><p class="cap">Los puntos marcan raíces y vértice. La línea punteada es el eje de simetría x = −b / 2a.</p></div></div>`;
+  const run=()=>{ let a=+$('l5a').value; if(a===0){ a=0.5; $('l5a').value=a; } const b=+$('l5b').value, c=+$('l5c').value; $('l5a-o').value=fmt(a,1); $('l5b-o').value=b; $('l5c-o').value=c;
+    const D=b*b-4*a*c, xv=-b/(2*a), yv=a*xv*xv+b*xv+c; const sgn=v=>v<0?' − '+fmt(-v):' + '+fmt(v);
+    $('l5eq').textContent='y = '+fmt(a,1)+'x²'+sgn(b)+'x'+sgn(c); $('l5d').textContent=fmt(D,2)+(D>0?' (dos raíces reales)':D===0?' (raíz doble)':' (sin raíces reales)');
+    let roots=[]; if(D>=0){ const s=Math.sqrt(D); roots=[(-b-s)/(2*a),(-b+s)/(2*a)].sort((p,q)=>p-q); } $('l5r').textContent=roots.length?roots.map(r=>'x = '+fmt(r,2)).join('   '):'ninguna real'; $('l5v').textContent='('+fmt(xv,2)+', '+fmt(yv,2)+')'; $('l5o').textContent=a>0?'arriba (mínimo)':'abajo (máximo)';
+    const half=Math.max(4,roots.length===2?(roots[1]-roots[0])*.8:0,Math.abs(xv)*.3); const xmin=xv-half, xmax=xv+half; const pts=[]; let ymin=Math.min(0,yv), ymax=Math.max(0,yv); for(let i=0;i<=160;i++){ const x=xmin+(xmax-xmin)*i/160, y=a*x*x+b*x+c; pts.push([x,y]); ymin=Math.min(ymin,y); ymax=Math.max(ymax,y); }
+    const pad=(ymax-ymin)*.1||1; const points=[{x:xv,y:yv,label:'vértice ('+fmt(xv,1)+', '+fmt(yv,1)+')',color:CH.lapis}]; roots.forEach((r,i)=>points.push({x:r,y:0,label:'x = '+fmt(r,2),align:i===0?'right':'left'}));
+    plot($('l5c2'),{xmin,xmax,ymin:ymin-pad,ymax:ymax+pad,xlab:'x',ylab:'y',xname:'x',xd:2,yd:2,series:[{label:'y',color:CH.gold,pts}],points,vlines:[{x:xv,label:'eje x = '+fmt(xv,1)}]}); };
+  bind(['l5a','l5b','l5c'],run);
+  $('l5p').querySelectorAll('.chip').forEach(ch=>ch.addEventListener('click',()=>{ $('l5a').value=ch.dataset.a; $('l5b').value=ch.dataset.b; $('l5c').value=ch.dataset.c; $('l5p').querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-pressed',x===ch)); run(); }));
+  $('l5p').querySelector('.chip').setAttribute('aria-pressed','true');
+},
+lab6(el){
+  el.innerHTML=`<div class="lab"><div class="ctl">
+    <p>Tronco de pirámide de bases cuadradas a (mayor) y b (menor) y altura h: <span class="formula" style="display:inline;padding:2px 8px">V = (h/3)(a² + ab + b²)</span>.</p>
+    ${slider('l6a','Base mayor a',2,20,4,1)}${slider('l6b','Base menor b',0,20,2,1)}${slider('l6h','Altura h',1,20,6,1)}
+    <dl class="readout"><dt>Volumen V</dt><dd class="big" id="l6v"></dd><dt>Cuenta del escriba</dt><dd id="l6s"></dd><dt>Apotema g</dt><dd id="l6g"></dd><dt>Superficie lateral</dt><dd id="l6l"></dd><dt>Superficie total</dt><dd id="l6t"></dd></dl>
+    <div class="chip-row"><button class="chip" id="l6m1" aria-pressed="true">V en función de h</button><button class="chip" id="l6m2" aria-pressed="false">V en función de b</button></div>
+  </div><div><canvas class="fig" id="l6f" style="height:240px"></canvas><p class="cap">El sólido a escala. Con b = 0 es una pirámide completa; con b = a es un prisma.</p><canvas class="chart" id="l6c"></canvas><p class="cap" id="l6cap"></p></div></div>`;
+  let mode='h';
+  const run=()=>{ const a=+$('l6a').value; let b=Math.min(+$('l6b').value,a); $('l6b').value=b; const h=+$('l6h').value; $('l6a-o').value=a; $('l6b-o').value=b; $('l6h-o').value=h;
+    const V=h/3*(a*a+a*b+b*b), g=Math.sqrt(h*h+Math.pow((a-b)/2,2)), Al=2*(a+b)*g, At=Al+a*a+b*b;
+    $('l6v').textContent=fmt(V,2)+' u³'; $('l6s').textContent=`(${h}/3)·(${a*a} + ${a*b} + ${b*b}) = ${fmt(h/3,2)} · ${a*a+a*b+b*b}`; $('l6g').textContent=fmt(g,2)+' u'; $('l6l').textContent=fmt(Al,2)+' u²'; $('l6t').textContent=fmt(At,2)+' u²';
+    const {c,w,hh}={...fig($('l6f')),hh:0}; const H2=$('l6f').clientHeight||240; const s=Math.min(w/(a*1.9+2),H2/(h+a*0.9+2)); const cx=w/2, cy=H2-20-a*0.5*s*0.5-4;
+    const P=(X,Y,Z)=>[cx+(X-Y)*0.866*s, cy+(X+Y)*0.5*s-Z*s]; const bot=[[-a/2,-a/2],[a/2,-a/2],[a/2,a/2],[-a/2,a/2]], top=[[-b/2,-b/2],[b/2,-b/2],[b/2,b/2],[-b/2,b/2]];
+    const faces=[]; for(let i=0;i<4;i++){ const j=(i+1)%4; const poly=[P(...bot[i],0),P(...bot[j],0),P(...top[j],h),P(...top[i],h)]; const depth=bot[i][0]+bot[i][1]+bot[j][0]+bot[j][1]; faces.push({poly,depth,shade:i===1?'#C9A14A':i===2?'#A98230':i===0?'#8A6A2A':'#7A5E26'}); }
+    faces.sort((p,q)=>p.depth-q.depth); c.fillStyle='rgba(0,0,0,.25)'; c.beginPath(); bot.forEach(([X,Y],i)=>{ const [px,py]=P(X,Y,-0.1); i?c.lineTo(px,py):c.moveTo(px,py); }); c.closePath(); c.fill();
+    for(const f of faces){ c.fillStyle=f.shade; c.beginPath(); f.poly.forEach(([px,py],i)=>i?c.lineTo(px,py):c.moveTo(px,py)); c.closePath(); c.fill(); c.strokeStyle='#3A2C10'; c.lineWidth=1.2; c.stroke(); }
+    c.fillStyle='#E7C877'; c.beginPath(); top.forEach(([X,Y],i)=>{ const [px,py]=P(X,Y,h); i?c.lineTo(px,py):c.moveTo(px,py); }); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle=CH.ink; c.font='600 12px "Source Sans 3",sans-serif'; c.textAlign='center'; c.textBaseline='top'; const [bx,by]=P(0,a/2,0); c.fillText('a = '+a,bx-0.25*a*s*.866,by+4); const [tx,ty]=P(0,0,h); c.textBaseline='bottom'; c.fillText('b = '+b,tx,ty-4); const [hx,hy]=P(a/2,a/2,h/2); c.textAlign='left'; c.textBaseline='middle'; c.fillText('h = '+h,hx+8,hy);
+    if(mode==='h'){ $('l6cap').textContent='V(h) con a y b fijos: una recta. Duplicar la altura duplica el volumen.'; plot($('l6c'),{xmin:0,xmax:20,ymin:0,ymax:20/3*(a*a+a*b+b*b)*1.05,xlab:'altura h',ylab:'volumen',xname:'h',xd:1,yd:1,series:[{label:'V(h)',color:CH.gold,pts:[[0,0],[20,20/3*(a*a+a*b+b*b)]]}],points:[{x:h,y:V,label:'V = '+fmt(V,1)}]}); }
+    else { $('l6cap').textContent='V(b) con a y h fijos: una parábola, porque b aparece al cuadrado. En b = 0 es una pirámide; en b = a, un prisma.'; const pts=[]; for(let x=0;x<=a;x+=a/80) pts.push([x,h/3*(a*a+a*x+x*x)]); plot($('l6c'),{xmin:0,xmax:a,ymin:0,ymax:h/3*3*a*a*1.05,xlab:'base menor b',ylab:'volumen',xname:'b',xd:1,yd:1,series:[{label:'V(b)',color:CH.gold,pts}],points:[{x:b,y:V,label:'V = '+fmt(V,1)}]}); } };
+  bind(['l6a','l6b','l6h'],run);
+  $('l6m1').onclick=()=>{ mode='h'; $('l6m1').setAttribute('aria-pressed','true'); $('l6m2').setAttribute('aria-pressed','false'); run(); };
+  $('l6m2').onclick=()=>{ mode='b'; $('l6m2').setAttribute('aria-pressed','true'); $('l6m1').setAttribute('aria-pressed','false'); run(); };
+}
+};
+</script>
+<script>
+/* ================================ PANEL, DESAFÍOS, FINAL ================================ */
+let panelOpen=false, modalOpen=false, currentSala=null, currentTab='egipto';
+const quizProgress={}; // salaId -> índice de la pregunta actual
+const TABS=[['egipto','En Egipto'],['lab','Laboratorio'],['hoy','Hoy'],['quiz','Desafío']];
+function openSala(sala){
+  currentSala=sala; panelOpen=true; modalOpen=false;
+  $('panel-glyph').textContent=sala.glyph; $('panel-title').textContent=sala.nombre+' · '+sala.tema;
+  $('tabs').hidden=false; renderTabs(); showTab(currentTab); $('panel').hidden=false; $('panel-close').focus();
+}
+function renderTabs(){ $('tabs').innerHTML=TABS.map(([k,l])=>`<button class="tab" role="tab" data-k="${k}" aria-selected="${k===currentTab}">${l}${k==='quiz'&&state.done[currentSala.id]?'<span class="dot" title="completado"></span>':''}</button>`).join('');
+  $('tabs').querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.k))); }
+function showTab(k){ currentTab=k; $('tabs').querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.k===k)); const body=$('panel-body'); body.scrollTop=0; const s=currentSala;
+  if(k==='egipto') body.innerHTML=`<div class="eyebrow">¿Dónde y para qué se usaba?</div><h3 style="margin:4px 0 10px;font-size:1.15rem">${s.tema}</h3>${s.egipto}`;
+  else if(k==='hoy') body.innerHTML=`<div class="eyebrow">¿Dónde se aplica hoy?</div><h3 style="margin:4px 0 10px;font-size:1.15rem">La misma matemática, otras herramientas</h3>${s.hoy}`;
+  else if(k==='lab'){ body.innerHTML=`<div class="eyebrow">Laboratorio · movelo y miralo</div><div id="labroot" style="margin-top:8px"></div>`; LABS[s.lab]($('labroot')); }
+  else buildQuiz(body,s);
+}
+function closePanel(){ panelOpen=false; modalOpen=false; $('panel').hidden=true; }
+$('panel-close').addEventListener('click',closePanel);
+$('panel').addEventListener('click',e=>{ if(e.target===$('panel')) closePanel(); });
+function showModal(title,html){ modalOpen=true; panelOpen=false; $('panel-glyph').textContent='𓂀'; $('panel-title').textContent=title; $('tabs').hidden=true; $('panel-body').innerHTML=html; $('panel').hidden=false; $('panel-close').focus(); }
+
+function buildQuiz(body,s){
+  if(state.done[s.id]){ body.innerHTML=`<div class="quiz"><div class="reward"><div class="big"><span style="font-family:var(--hiero)">𓆣</span> Escarabajo obtenido</div><p>Ya superaste el desafío de ${s.nombre}. Podés volver a revisar el laboratorio o seguir a otra sala.</p></div></div>`; return; }
+  const qi=quizProgress[s.id]||0; const q=s.quiz[qi];
+  body.innerHTML=`<div class="quiz"><div class="eyebrow">Desafío · pregunta ${qi+1} de ${s.quiz.length}</div><p style="margin-top:6px">Respondé las dos preguntas para ganar el escarabajo de esta sala. Si te equivocás, podés volver a intentar; el laboratorio sirve para comprobar.</p><div id="qbox"></div></div>`;
+  const box=$('qbox');
+  if(q.type==='dup'){
+    const rows=[]; let p=1,v=q.B; while(p<=q.A){ rows.push({p,v}); p*=2; v*=2; }
+    box.innerHTML=`<div class="q"><div class="qn">${q.A} × ${q.B} al estilo egipcio</div><p>${q.q}</p>
+      <table class="dup"><thead><tr><th>Potencia de 2</th><th>Duplicación de ${q.B}</th><th>Marcar</th></tr></thead><tbody>${rows.map((r,i)=>`<tr class="pick" data-i="${i}"><td>${r.p}</td><td>${r.v}</td><td class="chk"></td></tr>`).join('')}</tbody></table>
+      <div class="ans"><span class="unit">Suma de potencias marcadas: <b id="qsum">0</b> · Suma de duplicaciones: <b id="qprod">0</b></span></div>
+      <div class="ans"><button class="btn" id="qcheck">Comprobar</button></div><div class="fb" id="qfb"></div></div>`;
+    const sel=new Set(); const upd=()=>{ let sp=0,sv=0; sel.forEach(i=>{ sp+=rows[i].p; sv+=rows[i].v; }); $('qsum').textContent=sp; $('qprod').textContent=sv; };
+    box.querySelectorAll('tr.pick').forEach(tr=>tr.addEventListener('click',()=>{ const i=+tr.dataset.i; if(sel.has(i)) sel.delete(i); else sel.add(i); tr.classList.toggle('sel',sel.has(i)); tr.querySelector('.chk').textContent=sel.has(i)?'✔':''; upd(); }));
+    $('qcheck').addEventListener('click',()=>{ let sp=0,sv=0; sel.forEach(i=>{ sp+=rows[i].p; sv+=rows[i].v; }); state.attempts++; if(sp===q.A) correct(s,qi,`Las filas marcadas suman ${q.A}, y sus duplicaciones suman ${sv}. Entonces ${q.A} × ${q.B} = ${sv}.`); else wrong(`Las potencias marcadas suman ${sp}, no ${q.A}. Pista: ${q.hint}`); });
+    return;
+  }
+  box.innerHTML=`<div class="q"><div class="qn">Pregunta ${qi+1}</div><p>${q.q}</p><div class="ans"><input type="text" id="qin" inputmode="${q.text?'numeric':'decimal'}" autocomplete="off" placeholder="Tu respuesta"><span class="unit">${q.unit||''}</span><button class="btn" id="qcheck">Comprobar</button></div><div class="fb" id="qfb"></div></div>`;
+  const check=()=>{ const raw=$('qin').value.trim(); if(!raw) return; state.attempts++;
+    if(q.text){ if(raw.replace(/\s/g,'')===q.ans) correct(s,qi,`Correcto: ${q.ans}.`); else wrong(`No es ${raw}. Pista: ${q.hint}`); return; }
+    const v=parseNum(raw); if(!isFinite(v)){ wrong('Escribí un número (podés usar coma o punto para los decimales).'); return; }
+    if(Math.abs(v-q.ans)<=q.tol) correct(s,qi,`Correcto: ${fmt(q.ans)} ${q.unit||''}.`); else wrong(`${fmt(v)} no es la respuesta. Pista: ${q.hint}`); };
+  $('qcheck').addEventListener('click',check); $('qin').addEventListener('keydown',e=>{ if(e.key==='Enter') check(); }); $('qin').focus();
+}
+function wrong(msg){ const fb=$('qfb'); fb.className='fb bad'; fb.textContent=msg; }
+function correct(s,qi,msg){ const fb=$('qfb'); fb.className='fb ok'; fb.textContent=msg; $('qcheck').disabled=true;
+  if(qi+1<s.quiz.length){ quizProgress[s.id]=qi+1; setTimeout(()=>{ if(currentSala===s&&currentTab==='quiz') buildQuiz($('panel-body'),s); },1400); }
+  else { state.done[s.id]=true; save(); renderScarabs(); renderTabs(); setTimeout(()=>{ if(currentSala===s&&currentTab==='quiz') buildQuiz($('panel-body'),s); },1400);
+    const n=scarabCount(); toast(n===6?'¡Sexto escarabajo! La Cámara del Faraón está abierta al fondo de la galería.':`Escarabajo ${n} de 6 obtenido en ${s.nombre}.`,5000); }
+}
+
+/* Final */
+function showFinal(){ const m=Math.floor(state.elapsed/60), sec=Math.floor(state.elapsed%60);
+  $('final-text').innerHTML=`El faraón reconoce a <b>${state.name||'el aprendiz'}</b> como escriba del templo: recorrió las seis salas, movió cada función con sus propias manos y superó los seis desafíos.`;
+  $('final-stats').innerHTML=`<div><b>6 / 6</b><span>escarabajos</span></div><div><b>${plaqueCount()} / ${TOTAL_PLAQUES}</b><span>placas leídas</span></div><div><b>${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}</b><span>tiempo de visita</span></div><div><b>${state.attempts}</b><span>intentos en desafíos</span></div>`;
+  $('game').hidden=true; $('final').hidden=false; running=false; }
+$('btn-back').addEventListener('click',()=>{ $('final').hidden=true; $('game').hidden=false; resize(); running=true; last=performance.now(); requestAnimationFrame(loop); });
+$('btn-reset').addEventListener('click',()=>{ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} location.reload(); });
+
+/* Arranque */
+let mapReady=false;
+function startGame(){ if(!mapReady){ try{ document.fonts.load('18px "Noto Sans Egyptian Hieroglyphs"').then(()=>{ renderMap(); }); }catch(e){} renderMap(); mapReady=true; } $('start').hidden=true; $('final').hidden=true; $('game').hidden=false; $('plaques-total').textContent=TOTAL_PLAQUES; renderScarabs(); resize(); running=true; last=performance.now(); requestAnimationFrame(loop);
+  setTimeout(()=>toast(`Bienvenido, ${state.name||'aprendiz'}. Acercate a la estatua de Thot o a cualquier estela y presioná E.`,5000),300); }
+$('btn-start').addEventListener('click',()=>{ const n=$('pname').value.trim(); Object.assign(state,{name:n,done:{},plaques:{},attempts:0,elapsed:0,x:32,y:55,started:true}); save(); startGame(); });
+$('btn-continue').addEventListener('click',()=>{ startGame(); });
+$('pname').addEventListener('keydown',e=>{ if(e.key==='Enter') $('btn-start').click(); });
+function boot(hot){
+  if(hot&&hot.started){ Object.assign(state,hot); startGame(); return; }
+  if(load()){ $('btn-continue').hidden=false; $('pname').value=state.name||''; }
+}
+try{ window.claude?.hot?.snapshot?.(()=>({...state})); }catch(e){}
+(window.claude?.hot?.ready) ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data);
+</script>
+
+</body>
+</html>
